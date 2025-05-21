@@ -256,11 +256,6 @@ function ModelDisplay() {
 }
 
 export default function App() {
-  // Use the backend proxy endpoints instead of direct API
-  const API_URL = process.env.NODE_ENV === 'production' 
-    ? '/backend' // In production, use relative URL to hit Vercel rewrite
-    : 'http://localhost:5000/backend'; // In development, hit local Express server
-  
   const [phase, setPhase] = useState("text"); // "text", "animation", "border", "image"
   // const [step, setStep] = useState(0); // 0: typography, 1: morph, 2: main UI
   const [image, setImage] = useState(DEFAULT_IMAGE);
@@ -466,10 +461,11 @@ export default function App() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-          // Use the backend proxy that handles certificate issues
           let res;
+          // First try HTTPS, fallback to HTTP if it fails
           try {
-            res = await fetch(`${API_URL}/api/v1/uploadFile`, {
+            console.log('Attempting HTTPS request...');
+            res = await fetch("https://34.192.150.36/api/v1/uploadFile", {
               method: "POST",
               body: formData,
               headers: {
@@ -477,9 +473,18 @@ export default function App() {
               },
               signal: controller.signal
             });
-          } catch (fetchError) {
-            console.error('Fetch error:', fetchError);
-            throw new Error(`Network error: ${fetchError.message}`);
+          } catch (error) {
+            console.error('HTTPS request failed:', error);
+            // Try HTTP as fallback
+            console.log('Falling back to HTTP request...');
+            res = await fetch("http://34.192.150.36/api/v1/uploadFile", {
+              method: "POST",
+              body: formData,
+              headers: {
+                'Accept': 'application/json'
+              },
+              signal: controller.signal
+            });
           }
 
           clearTimeout(timeoutId);
@@ -581,19 +586,27 @@ export default function App() {
     processingCompleteRef.current = false;
     try {
       console.log('Generating variations for fileId:', fileId);
-      
-      // Use the backend proxy that handles certificate issues
       let response;
+      
+      // First try HTTPS, fallback to HTTP if it fails
       try {
-        response = await fetch(`${API_URL}/api/v1/generate/${fileId}/abc`, {
+        console.log('Attempting HTTPS request for variations...');
+        response = await fetch(`https://34.192.150.36/api/v1/generate/${fileId}/abc`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
           }
         });
-      } catch (fetchError) {
-        console.error('Fetch error:', fetchError);
-        throw new Error(`Network error: ${fetchError.message}`);
+      } catch (error) {
+        console.error('HTTPS request failed for variations:', error);
+        // Try HTTP as fallback
+        console.log('Falling back to HTTP request for variations...');
+        response = await fetch(`http://34.192.150.36/api/v1/generate/${fileId}/abc`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
       }
 
       if (!response.ok) {
