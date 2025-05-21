@@ -294,8 +294,8 @@ export default function App() {
   const [debugInfo, setDebugInfo] = useState({ x: 0, y: 0 });
   const [imageClickEnabled, setImageClickEnabled] = useState(true);
 const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://34.192.150.36'
-  : 'https://34.192.150.36';
+  ? 'https://tools.qrplus.ai'
+  : 'https://tools.qrplus.ai';
   // Disable image click when certain interactions are happening
   useEffect(() => {
     // Disable image clicking when showing dialup, 3D model, or processing
@@ -584,7 +584,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
       // Use relative URL that will be proxied through Vercel
       try {
         console.log('Making variations API request through Vercel proxy...');
-        response = await fetch(`${API_BASE_URL}api/v1/generate/${fileId}/abc`, {
+        response = await fetch(`${API_BASE_URL}/api/v1/generate/${fileId}/abc`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'

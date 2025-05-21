@@ -13,7 +13,7 @@ const port = process.env.PORT || 5000;
 app.use(
   "/api/v1/uploadFile",
   createProxyMiddleware({
-    target: "http://34.192.150.36",
+    target: "https://tools.qrplus.ai/",
     changeOrigin: true,
     pathRewrite: {
       "^/api/v1/uploadFile": "/api/v1/uploadFile"
