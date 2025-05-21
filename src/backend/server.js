@@ -18,7 +18,12 @@ app.use(
     secure: false,
     pathRewrite: {
       "^/api/v1/uploadFile": "/api/v1/uploadFile"
-    }
+    },
+    onError: (err, req, res) => {
+      console.error('Proxy error:', err);
+      res.status(500).send('Proxy error: ' + err.message);
+    },
+    logLevel: 'debug' // Set to 'info' in production
   })
 );
 
@@ -31,7 +36,12 @@ app.use(
     secure: false,
     pathRewrite: {
       "^/api/v1/generate": "/api/v1/generate"
-    }
+    },
+    onError: (err, req, res) => {
+      console.error('Proxy error:', err);
+      res.status(500).send('Proxy error: ' + err.message);
+    },
+    logLevel: 'debug' // Set to 'info' in production
   })
 );
 

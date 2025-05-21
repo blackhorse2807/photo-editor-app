@@ -464,15 +464,13 @@ export default function App() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-          const res = await fetch(`${API_URL}/api/v1/uploadFile`, {
+          const res = await fetch("/api/v1/uploadFile", {
             method: "POST",
             body: formData,
             headers: {
-              'Accept': 'application/json',
-              'Origin': window.location.origin
+              'Accept': 'application/json'
             },
-            signal: controller.signal,
-            mode: 'cors'
+            signal: controller.signal
           });
 
           clearTimeout(timeoutId);
@@ -574,13 +572,11 @@ export default function App() {
     processingCompleteRef.current = false;
     try {
       console.log('Generating variations for fileId:', fileId);
-      const response = await fetch(`${API_URL}/api/v1/generate/${fileId}/abc`, {
+      const response = await fetch(`/api/v1/generate/${fileId}/abc`, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          'Origin': window.location.origin
-        },
-        mode: 'cors'
+          'Accept': 'application/json'
+        }
       });
 
       if (!response.ok) {
