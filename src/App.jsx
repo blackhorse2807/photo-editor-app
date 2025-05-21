@@ -256,6 +256,9 @@ function ModelDisplay() {
 }
 
 export default function App() {
+  // Define API URL at component level
+  const API_URL = 'https://34.192.150.36';
+  
   const [phase, setPhase] = useState("text"); // "text", "animation", "border", "image"
   // const [step, setStep] = useState(0); // 0: typography, 1: morph, 2: main UI
   const [image, setImage] = useState(DEFAULT_IMAGE);
@@ -461,35 +464,16 @@ export default function App() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-          let res;
-          try {
-            res = await fetch("https://34.192.150.36/api/v1/uploadFile", {
-              method: "POST",
-              body: formData,
-              headers: {
-                'Accept': 'application/json'
-              },
-              signal: controller.signal,
-              // Development only - ignore SSL certificate issues
-              mode: 'cors',
-              credentials: 'omit'
-            });
-          } catch (fetchError) {
-            // If HTTPS fails, try HTTP as fallback
-            if (fetchError.message.includes('ERR_CERT_')) {
-              console.log('SSL certificate error, falling back to HTTP...');
-              res = await fetch("http://34.192.150.36/api/v1/uploadFile", {
-                method: "POST",
-                body: formData,
-                headers: {
-                  'Accept': 'application/json'
-                },
-                signal: controller.signal
-              });
-            } else {
-              throw fetchError;
-            }
-          }
+          const res = await fetch(`${API_URL}/api/v1/uploadFile`, {
+            method: "POST",
+            body: formData,
+            headers: {
+              'Accept': 'application/json',
+              'Origin': window.location.origin
+            },
+            signal: controller.signal,
+            mode: 'cors'
+          });
 
           clearTimeout(timeoutId);
   
@@ -590,11 +574,13 @@ export default function App() {
     processingCompleteRef.current = false;
     try {
       console.log('Generating variations for fileId:', fileId);
-      const response = await fetch(`http://34.192.150.36/api/v1/generate/${fileId}/abc`, {
+      const response = await fetch(`${API_URL}/api/v1/generate/${fileId}/abc`, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json'
-        }
+          'Accept': 'application/json',
+          'Origin': window.location.origin
+        },
+        mode: 'cors'
       });
 
       if (!response.ok) {
