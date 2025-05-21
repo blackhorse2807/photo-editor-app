@@ -462,21 +462,9 @@ export default function App() {
           const timeoutId = setTimeout(() => controller.abort(), 30000);
 
           let res;
-          // First try HTTPS, fallback to HTTP if it fails
+          // Use relative URL that will be proxied through Vercel
           try {
-            console.log('Attempting HTTPS request...');
-            res = await fetch("https://34.192.150.36/api/v1/uploadFile", {
-              method: "POST",
-              body: formData,
-              headers: {
-                'Accept': 'application/json'
-              },
-              signal: controller.signal
-            });
-          } catch (error) {
-            console.error('HTTPS request failed:', error);
-            // Try HTTP as fallback
-            console.log('Falling back to HTTP request...');
+            console.log('Making API request through Vercel proxy...');
             res = await fetch("http://34.192.150.36/api/v1/uploadFile", {
               method: "POST",
               body: formData,
@@ -485,6 +473,9 @@ export default function App() {
               },
               signal: controller.signal
             });
+          } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
           }
 
           clearTimeout(timeoutId);
@@ -588,25 +579,18 @@ export default function App() {
       console.log('Generating variations for fileId:', fileId);
       let response;
       
-      // First try HTTPS, fallback to HTTP if it fails
+      // Use relative URL that will be proxied through Vercel
       try {
-        console.log('Attempting HTTPS request for variations...');
-        response = await fetch(`https://34.192.150.36/api/v1/generate/${fileId}/abc`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-      } catch (error) {
-        console.error('HTTPS request failed for variations:', error);
-        // Try HTTP as fallback
-        console.log('Falling back to HTTP request for variations...');
+        console.log('Making variations API request through Vercel proxy...');
         response = await fetch(`http://34.192.150.36/api/v1/generate/${fileId}/abc`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
           }
         });
+      } catch (error) {
+        console.error('API request failed for variations:', error);
+        throw error;
       }
 
       if (!response.ok) {
