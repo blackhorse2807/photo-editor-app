@@ -293,7 +293,9 @@ export default function App() {
   const isDraggingRef = useRef(false);
   const [debugInfo, setDebugInfo] = useState({ x: 0, y: 0 });
   const [imageClickEnabled, setImageClickEnabled] = useState(true);
-
+const API_BASE_URL = process.env.NODE_ENV === 'development' 
+  ? 'http://34.192.150.36'
+  : 'https://34.192.150.36';
   // Disable image click when certain interactions are happening
   useEffect(() => {
     // Disable image clicking when showing dialup, 3D model, or processing
@@ -465,7 +467,7 @@ export default function App() {
           // Use relative URL that will be proxied through Vercel
           try {
             console.log('Making API request through Vercel proxy...');
-            res = await fetch("http://34.192.150.36/api/v1/uploadFile", {
+            res = await fetch(`${API_BASE_URL}/api/v1/uploadFile`, {
               method: "POST",
               body: formData,
               headers: {
@@ -582,7 +584,7 @@ export default function App() {
       // Use relative URL that will be proxied through Vercel
       try {
         console.log('Making variations API request through Vercel proxy...');
-        response = await fetch(`http://34.192.150.36/api/v1/generate/${fileId}/abc`, {
+        response = await fetch(`${API_BASE_URL}/api/v1/generate/${fileId}/abc`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'

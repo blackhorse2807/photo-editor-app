@@ -48,8 +48,4 @@ const MainUI = () => {
   );
 };
 
-<<<<<<< HEAD
 export default MainUI; 
-=======
-export default MainUI; 
->>>>>>> 9039fd2 (Initial commit)
