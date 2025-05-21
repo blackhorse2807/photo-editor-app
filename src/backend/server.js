@@ -25,7 +25,7 @@ app.use(
 app.use(
   "/api/v1/generate",
   createProxyMiddleware({
-    target: "http://34.192.150.36",
+    target: " https://tools.qrplus.ai/ ",
     changeOrigin: true,
     pathRewrite: {
       "^/api/v1/generate": "/api/v1/generate"
@@ -37,7 +37,7 @@ app.use(
 const allowedOrigins = [
   'https://algonomic-ai.vercel.app',
   'http://localhost:3000',
-  'https://photo-editor-app-ecru.vercel.app/'
+  'https://photo-editor-app-ecru.vercel.app'
 ];
 
 app.use(cors({

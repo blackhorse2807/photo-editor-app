@@ -584,7 +584,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
       // Use relative URL that will be proxied through Vercel
       try {
         console.log('Making variations API request through Vercel proxy...');
-        response = await fetch(`${API_BASE_URL}/api/v1/generate/${fileId}/abc`, {
+        response = await fetch(`${API_BASE_URL}api/v1/generate/${fileId}/abc`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
