@@ -1,0 +1,25 @@
+/* Default background for the main container */
+.main-container {
+  background: linear-gradient(to bottom, #fff 54%, #8ee6ff 100%);
+  background-size: 100% 100%;
+}
+
+/* Permanent background after border appears */
+.permanent-background {
+  background: linear-gradient(135deg, #00ffcc 0%, #ff5757 30%, #4287f5 70%, #00eeff 100%);
+  background-size: 300% 300%;
+  animation: background-shift 30s ease-in-out infinite alternate;
+}
+
+/* Animation for the background shift effect */
+@keyframes background-shift {
+  0% {
+    background-position: 0% 30%;
+  }
+  50% {
+    background-position: 100% 70%;
+  }
+  100% {
+    background-position: 0% 30%;
+  }
+} 

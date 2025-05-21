@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    button {
+      padding: 10px 15px;
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    button:hover {
+      background-color: #357abd;
+    }
+    
+    .result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      display: none;
+    }
+    
+    img {
+      max-width: 100%;
+      height: auto;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>File Upload Test</h1>
+  <p>Click the button below to test the file selection dialog:</p>
+  
+  <button id="uploadButton">Select Image</button>
+  <div id="result" class="result"></div>
+  
+  <script>
+    document.getElementById('uploadButton').addEventListener('click', function() {
+      // Create file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      
+      // Handle file selection
+      input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          // Show result
+          const result = document.getElementById('result');
+          result.style.display = 'block';
+          
+          // Show file info
+          result.innerHTML = `
+            <p><strong>File selected:</strong> ${file.name}</p>
+            <p><strong>Type:</strong> ${file.type}</p>
+            <p><strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB</p>
+          `;
+          
+          // Show image preview
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            result.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      
+      // Add to DOM and click
+      document.body.appendChild(input);
+      setTimeout(() => {
+        input.click();
+        // Remove from DOM
+        setTimeout(() => {
+          document.body.removeChild(input);
+        }, 500);
+      }, 100);
+    });
+  </script>
+</body>
+</html> 
