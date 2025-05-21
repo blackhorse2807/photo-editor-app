@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://your-backend-url.com/api/:path*"
+    },
+    {
+      "source": "/backend/api/:path*",
+      "destination": "https://your-backend-url.com/backend/api/:path*"
     }
   ],
   "headers": [

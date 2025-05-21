@@ -4,12 +4,73 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { nanoid } = require('nanoid');
+const https = require('https');
+const axios = require('axios');
 const { createProxyMiddleware } = require("http-proxy-middleware");
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Proxy: Forward upload requests to original API
+// Create HTTPS agent that accepts self-signed certificates
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false // WARNING: This allows insecure SSL connections - only use for development
+});
+
+// Add direct API endpoints to bypass certificate issues
+app.post('/backend/api/v1/uploadFile', async (req, res) => {
+  try {
+    console.log('Proxying uploadFile request to API');
+    
+    // Forward the request to the API with certificate validation disabled
+    const response = await axios({
+      method: 'post',
+      url: 'https://34.192.150.36/api/v1/uploadFile',
+      data: req.body,
+      headers: req.headers,
+      httpsAgent // Using the agent that ignores certificate validation
+    });
+    
+    // Send the API response back to the client
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    console.error('Error proxying to API:', error.message);
+    if (error.response) {
+      // Forward API error response
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      // Network or other error
+      res.status(500).json({ error: 'Failed to connect to API server', details: error.message });
+    }
+  }
+});
+
+app.get('/backend/api/v1/generate/:fileId/:param', async (req, res) => {
+  try {
+    console.log(`Proxying generate request for file ${req.params.fileId}`);
+    
+    // Forward the request to the API with certificate validation disabled
+    const response = await axios({
+      method: 'get',
+      url: `https://34.192.150.36/api/v1/generate/${req.params.fileId}/${req.params.param}`,
+      headers: req.headers,
+      httpsAgent // Using the agent that ignores certificate validation
+    });
+    
+    // Send the API response back to the client
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    console.error('Error proxying to API:', error.message);
+    if (error.response) {
+      // Forward API error response
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      // Network or other error
+      res.status(500).json({ error: 'Failed to connect to API server', details: error.message });
+    }
+  }
+});
+
+// Keep the existing proxy middleware as backup
 app.use(
   "/api/v1/uploadFile",
   createProxyMiddleware({
@@ -27,7 +88,7 @@ app.use(
   })
 );
 
-// Proxy: Forward generate requests to original API
+// Keep the existing proxy middleware as backup
 app.use(
   "/api/v1/generate",
   createProxyMiddleware({
