@@ -461,14 +461,35 @@ export default function App() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-          const res = await fetch("http://34.192.150.36/api/v1/uploadFile", {
-            method: "POST",
-            body: formData,
-            headers: {
-              'Accept': 'application/json'
-            },
-            signal: controller.signal
-          });
+          let res;
+          try {
+            res = await fetch("https://34.192.150.36/api/v1/uploadFile", {
+              method: "POST",
+              body: formData,
+              headers: {
+                'Accept': 'application/json'
+              },
+              signal: controller.signal,
+              // Development only - ignore SSL certificate issues
+              mode: 'cors',
+              credentials: 'omit'
+            });
+          } catch (fetchError) {
+            // If HTTPS fails, try HTTP as fallback
+            if (fetchError.message.includes('ERR_CERT_')) {
+              console.log('SSL certificate error, falling back to HTTP...');
+              res = await fetch("http://34.192.150.36/api/v1/uploadFile", {
+                method: "POST",
+                body: formData,
+                headers: {
+                  'Accept': 'application/json'
+                },
+                signal: controller.signal
+              });
+            } else {
+              throw fetchError;
+            }
+          }
 
           clearTimeout(timeoutId);
   
@@ -1553,7 +1574,7 @@ export default function App() {
                       position: "absolute",
                       width: isMobile ? boxSize : boxSize * 0.9,
                       height: boxSize * 0.9,
-                      top: "320px",
+                      top: isMobile ? "270px" : "320px",
                       left: isMobile ? "5px" : "20px",
                       transform: "translate(-50%, -50%)",
                       zIndex: 100,
@@ -1694,7 +1715,7 @@ export default function App() {
                 )}
 
                 {/* Only show DialUp when 3D model is not shown */}
-                {/* {showDialUp && !show3DModel && (
+                {showDialUp && !show3DModel && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 20 }}
@@ -1710,7 +1731,7 @@ export default function App() {
                   >
                     <DialUpContainer rotation={dialRotation} />
                   </motion.div>
-          )} */}
+          )}
               </AnimatePresence>
             </motion.div>
           )}
