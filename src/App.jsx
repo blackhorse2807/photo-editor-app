@@ -18,6 +18,34 @@ const animationStyles = `
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+
+  @keyframes rippleAnimation {
+    0% {
+      transform: scale(1.05);
+      opacity: 0.3;
+    }
+    75% {
+      opacity: 0.15;
+    }
+    100% {
+      transform: scale(1.2);
+      opacity: 0;
+    }
+  }
+
+  @keyframes qrButtonRipple {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 0.3;
+    }
+    100% {
+      transform: scale(1.15);
+      opacity: 0;
+    }
+  }
 `;
 
 const styleSheet = document.createElement("style");
@@ -256,46 +284,33 @@ function ModelDisplay() {
 }
 
 export default function App() {
-  const [phase, setPhase] = useState("text"); // "text", "animation", "border", "image"
-  // const [step, setStep] = useState(0); // 0: typography, 1: morph, 2: main UI
+  const [phase, setPhase] = useState("text");
   const [image, setImage] = useState(DEFAULT_IMAGE);
   const [loading, setLoading] = useState(false);
-  // const [magentaGlow, setMagentaGlow] = useState(false);
   const [fileId, setFileId] = useState(null);
-  // const [showSplash, setShowSplash] = useState(false);
-  // const [showImageBox, setShowImageBox] = useState(false);
-  // const [showBorder, setShowBorder] = useState(false);
-  // const [showImage, setShowImage] = useState(false);
-  // const [iconSplit, setIconSplit] = useState(false);
-  // const [ripple, setRipple] = useState({ active: false, x: 0, y: 0 });
-  // const [loadRipple, setLoadRipple] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showRipple, setShowRipple] = useState(false);
   const [showIcon, setShowIcon] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [showProcessButtons, setShowProcessButtons] = useState(false);
-  // const [urlInputValue, setUrlInputValue] = useState("");
-  // const [shouldExpandUrl, setShouldExpandUrl] = useState(false);
   const [variations, setVariations] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  // const [selectedVariation, setSelectedVariation] = useState(null);
-  // const [showButtons, setShowButtons] = useState(false);
-  // const [showVariations, setShowVariations] = useState(false);
   const [showDialUp, setShowDialUp] = useState(false);
   const [dialRotation, setDialRotation] = useState(0);
-  const processingCompleteRef = useRef(false);
   const [show3DModel, setShow3DModel] = useState(false);
-  // const [modelRotation, setModelRotation] = useState([0, 0, 0]);
   const [currentVariationIndex, setCurrentVariationIndex] = useState(0);
-  // const orbitControlsRef = useRef(null);
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
-  // const dragAreaRef = useRef(null);
-  const isDraggingRef = useRef(false);
   const [debugInfo, setDebugInfo] = useState({ x: 0, y: 0 });
   const [imageClickEnabled, setImageClickEnabled] = useState(true);
-const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'https://tools.qrplus.ai'
-  : 'https://tools.qrplus.ai';
+  const isDraggingRef = useRef(false);
+  const processingCompleteRef = useRef(false);
+  const API_BASE_URL = process.env.NODE_ENV === 'development' 
+    ? 'https://tools.qrplus.ai'
+    : 'https://tools.qrplus.ai';
+
+  // Add new state for icon animations
+  const [showSideIcons, setShowSideIcons] = useState(false);
+
   // Disable image click when certain interactions are happening
   useEffect(() => {
     // Disable image clicking when showing dialup, 3D model, or processing
@@ -336,10 +351,16 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
       @keyframes rippleAnimation {
         0% {
           transform: scale(1);
-          opacity: 0.7;
+          opacity: 0.35;
+        }
+        40% {
+          opacity: 0.25;
+        }
+        80% {
+          opacity: 0.15;
         }
         100% {
-          transform: scale(1.1);
+          transform: scale(1.15);
           opacity: 0;
         }
       }
@@ -372,20 +393,6 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
     return () => clearTimeout(timer);
     }
   }, [showIcon, show3DModel]);
-
-  // const handleTypographyComplete = () => {
-  //   // setStep(1);
-  //   setPhase("image");
-  // };
-
-  // const handleMorphComplete = () => {
-  //   // setStep(2);
-  //   // Show splash screen after morph transition
-  //   // setShowSplash(true);
-  //   // Hide splash after 2 seconds
-  //   // const timer = setTimeout(() => setShowSplash(false), 2000);
-  //   // return () => clearTimeout(timer);
-  // };
 
   // Handle image click and file selection
   const handleImageClick = async (e) => {
@@ -576,7 +583,6 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
 
     setIsProcessing(true);
     setShowDialUp(false); // Ensure DialUp is hidden during processing
-    processingCompleteRef.current = false;
     try {
       console.log('Generating variations for fileId:', fileId);
       let response;
@@ -648,7 +654,6 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
       }
 
       // After processing is complete - clean up UI and show 3D model
-      processingCompleteRef.current = true;
       setShow3DModel(true);
       setShowProcessButtons(false);
       setShowIcon(false);
@@ -1038,6 +1043,18 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
   //   setImage(imageUrl);
   // };
 
+  // Add state for Generate QR button ripple
+  const [showQRRipple, setShowQRRipple] = useState(false);
+
+  // Handle Generate QR button click with ripple
+  const handleGenerateQRClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowQRRipple(true);
+    setTimeout(() => setShowQRRipple(false), 600);
+    handleGenerateQR();
+  };
+
   return (
     <motion.div
       style={{
@@ -1165,9 +1182,10 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
             height: boxSize,
             top: isMobile ? "10px" : "-70px",
             borderRadius: "4px",
-            border: `3px solid ${image !== DEFAULT_IMAGE ? "#45FF02" : "#6EC2FF"}`,
+            border: `3px solid ${image === DEFAULT_IMAGE ? "#6EC2FF" : "#45FF02"}`,
             cursor: imageClickEnabled ? "pointer" : "default",
-            ...processingBorderStyle
+            ...processingBorderStyle,
+            transition: 'border-color 0.3s ease'
           }}
               onClick={handleImageClick}
               onDragStart={(e) => e.preventDefault()}
@@ -1180,13 +1198,14 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                       key={`ripple-${index}`}
           style={{
             position: "absolute",
-                        inset: -3 - (index * 3),
-                        border: "2px solid #40ff00",
-                        borderRadius: "4px",
-                        opacity: 0.7,
-                        animation: `rippleAnimation 0.8s ease-out ${index * 0.1}s infinite`,
+                        inset: -3 - (index * 0.6),
+                        border: `2px solid ${image === DEFAULT_IMAGE ? "#6EC2FF" : "#45FF02"}`,
+                        borderRadius: "1px",
+                        opacity: 0.35,
+                        animation: `rippleAnimation 1.6s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.15}s infinite`,
                         pointerEvents: "none",
                         zIndex: 3,
+                        transition: 'all 0.3s ease-out'
                       }}
                     />
                   ))}
@@ -1205,7 +1224,8 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
               zIndex: 1,
                   background: "#fff",
                   display: "flex",
-                  flexDirection: "column"
+                  flexDirection: "column",
+                  backdropFilter: "none"  // Ensure no blur on the image container
                 }}
               >
                 {loading ? (
@@ -1295,9 +1315,13 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                         initial={{ opacity: 0, y: 0 }}
                         animate={{ 
                           opacity: 1, 
-                          y: 20  // Just move down 20px from its starting position
+                          y: 20
                         }}
-                        exit={{ opacity: 0 }}
+                        exit={{ 
+                          opacity: 0,
+                          scale: 0.9,
+                          transition: { duration: 0.2 }
+                        }}
                         transition={{ 
                           duration: 0.8,
                           ease: "easeOut"
@@ -1306,15 +1330,12 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
             position: "absolute",
             left: "50%",
                           top: "calc(100% + 60px)",
-                          // bottom: "-110px",
                           transform: "translateX(-50%)",
                           width: "40px",
                           height: "40px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-                          background: "#40ff00",
-                          borderRadius: "1px",
                           cursor: "pointer",
                           zIndex: 10,
                   }}
@@ -1323,8 +1344,8 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                           src="/images/icon-below-image.png" 
                           alt="Icon" 
                 style={{
-                            width: "28px",
-                            height: "28px",
+                            width: "32px",
+                            height: "32px",
                             objectFit: "contain"
                           }}
                   />
@@ -1342,14 +1363,12 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                         flexDirection: isMobile ? "row" : "row"
                       }}>
                         <motion.div
-                          initial={{ x: 200 }}
-                          animate={{ x: 0 }}
+                          initial={{ x: 200, opacity: 0, scale: 0.8 }}
+                          animate={{ x: 0, opacity: 1, scale: 1 }}
                           transition={{
-                            duration: 0.8,
+                            duration: 0.6,
                             ease: [0.4, 0, 0.2, 1],
-                            type: "spring",
-                            stiffness: 100,
-                            damping: 20
+                            opacity: { duration: 0.4 }
                           }}
             style={{
                             width: "32px",
@@ -1357,17 +1376,15 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-                            background: "#40ff00",
-                            borderRadius: "1px",
-                            border: "0.5px solid rgba(64, 255, 0, 0.5)"
+                            borderRadius: "1px"
                           }}
                         >
                           <img
                             src="/images/icon-below-image.png" 
                             alt="Icon"
                             style={{
-                              width: "28px",
-                              height: "28px",
+                              width: "32px",
+                              height: "32px",
                               objectFit: "contain"
                             }}
                           />
@@ -1376,9 +1393,9 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                           initial={{ width: 0, opacity: 0 }}
                           animate={{ width: "calc(100% - 32px)", opacity: 1 }}
                           transition={{
-                            duration: 0.8,
+                            duration: 0.6,
                             ease: [0.4, 0, 0.2, 1],
-                            opacity: { duration: 0.4, delay: 0.2 }
+                            opacity: { duration: 0.3, delay: 0.2 }
                           }}
                           style={{
                             height: "32px",
@@ -1386,8 +1403,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                             borderRadius: "1px",
                             display: "flex",
                             alignItems: "center",
-                            overflow: "hidden",
-                            border: "0.5px solid rgba(64, 255, 0, 0.5)"
+                            overflow: "hidden"
                           }}
                         >
                           <div style={{
@@ -1523,46 +1539,67 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
       />
     </motion.div>
 
-                    {/* Generate QR Button - Kept below image */}
+                    {/* Generate QR Button */}
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3, delay: 0.1 }}
-      style={{
-                        width: "80px",
-                        height: "80px",
-                        borderRadius: "1px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+                      style={{
+                        width: "65px",
+                        height: "65px",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         cursor: isProcessing ? "wait" : "pointer",
                         opacity: isProcessing ? 0.7 : 1,
                         position: "absolute",
                         bottom: "-150px",
-                        left: "36%",
+                        left: "43%",
                         zIndex: 10,
-                        transform: "translateX(-50%)"
+                        transform: "translateX(-50%)",
+                        overflow: "visible"
                       }}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        const rippleContainer = e.currentTarget;
+                        
+                        // Create multiple ripples for a more natural effect
+                        [0, 1, 2].forEach((i) => {
+                          const ripple = document.createElement('div');
+                          ripple.style.position = 'absolute';
+                          ripple.style.top = '0';
+                          ripple.style.left = '0';
+                          ripple.style.right = '0';
+                          ripple.style.bottom = '0';
+                          ripple.style.border = '1.5px solid rgba(255, 255, 255, 0.85)';
+                          ripple.style.borderRadius = '50%';
+                          ripple.style.animation = `qrButtonRipple 1s cubic-bezier(0.25, 0.35, 0.25, 0.8) ${i * 0.15}s`;
+                          ripple.style.pointerEvents = 'none';
+                          rippleContainer.appendChild(ripple);
+                          setTimeout(() => ripple.remove(), 1000 + (i * 150));
+                        });
+                        
                         handleGenerateQR();
                       }}
-    >
-      <img
+                    >
+                      <img
                         src="/images/GenerateQRBtn.png" 
                         alt="Generate QR" 
                         style={{
-                          width: "100px",
-                          height: "80px",
-                          pointerEvents: "none"
+                          width: "60px",
+                          height: "60px",
+                          pointerEvents: "none",
+                          position: "relative",
+                          zIndex: 2
                         }}
-      />
-    </motion.div>
+                      />
+                    </motion.div>
                   </>
                 )}
 
-                {/* Restore 3D model with proper drag handling */}
+                {/* 3D Model with side icons */}
                 {show3DModel && variations.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -1581,7 +1618,41 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                       boxSizing: "border-box"
                     }}
                   >
-                    {/* Draggable Canvas Wrapper */}
+                    {/* Side Icons */}
+                    {showSideIcons && (
+                      <>
+                        <motion.img
+                          src="/images/icn1.png"
+                          alt="Icon 1"
+                          initial={{ x: "50%", y: "50%", opacity: 0, scale: 0.5 }}
+                          animate={{ x: "-120%", y: "50%", opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                          style={{
+                            position: "absolute",
+                            width: "50px",
+                            height: "50px",
+                            transform: "translate(-50%, -50%)",
+                            cursor: "pointer"
+                          }}
+                        />
+                        <motion.img
+                          src="/images/icn2.png"
+                          alt="Icon 2"
+                          initial={{ x: "50%", y: "50%", opacity: 0, scale: 0.5 }}
+                          animate={{ x: "220%", y: "50%", opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                          style={{
+                            position: "absolute",
+                            width: "50px",
+                            height: "50px",
+                            transform: "translate(-50%, -50%)",
+                            cursor: "pointer"
+                          }}
+                        />
+                      </>
+                    )}
+
+                    {/* Existing 3D model content */}
                     <div 
                       style={{ 
                         width: "100%", 
@@ -1596,7 +1667,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
                         border: "none",
                         borderRadius: "0",
                         background: "transparent",
-                        clipPath: "circle(42% at center)", // Tighter circular clip path
+                        clipPath: "circle(42% at center)",
                       }}
                       onMouseDown={handleMouseDown}
                       onTouchStart={handleTouchStart}
@@ -1689,26 +1760,30 @@ const API_BASE_URL = process.env.NODE_ENV === 'development'
   </div>
                     </div>
                     
-                    {/* Debug info to show current variation */}
-                    {/* <div style={{
-                      position: "absolute",
-                      bottom: "-30px",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      color: "white",
-                      backgroundColor: "rgba(0,0,0,0.7)",
-                      padding: "4px 8px",
-                      borderRadius: "4px",
-                      fontSize: "12px",
-                      userSelect: "none",
-                      pointerEvents: "none"
-                    }}>
-                      Variation: {currentVariationIndex + 1}/{variations.length}
-                      {variations[currentVariationIndex]?.settings && 
-                        ` (B: ${variations[currentVariationIndex].settings.b.toFixed(2)}, C: ${variations[currentVariationIndex].settings.c.toFixed(2)})`}
-                      {" | "} Pos: {debugInfo.x.toFixed(2)}, {debugInfo.y.toFixed(2)} 
-                      {" | "} {Math.sqrt(debugInfo.x*debugInfo.x + debugInfo.y*debugInfo.y) <= 1.0 ? "In Range" : "Out of Range"}
-                    </div> */}
+                    {/* QR Image below 3D model */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.3 }}
+                      style={{
+                        position: "absolute",
+                        left: "50%",
+                        bottom: "-100px",
+                        transform: "translateX(-50%)",
+                        cursor: "pointer"
+                      }}
+                      onClick={() => setShowSideIcons(true)}
+                    >
+                      <img
+                        src="/images/QR.png"
+                        alt="QR"
+                        style={{
+                          width: "60px",
+                          height: "60px",
+                          objectFit: "contain"
+                        }}
+                      />
+                    </motion.div>
                   </motion.div>
                 )}
 
