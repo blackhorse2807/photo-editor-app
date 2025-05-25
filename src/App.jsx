@@ -14,35 +14,30 @@ const DEFAULT_IMAGE = "/face.png";
 
 // Styles for animations
 const animationStyles = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
   @keyframes rippleAnimation {
     0% {
-      transform: scale(1.05);
-      opacity: 0.3;
+      transform: scale(1);
+      opacity: 0.4;
+      border-width: 2px;
     }
-    75% {
-      opacity: 0.15;
+    50% {
+      opacity: 0.2;
+      border-width: 1.5px;
     }
     100% {
-      transform: scale(1.2);
+      transform: scale(1.25);
       opacity: 0;
+      border-width: 1.5px;
     }
   }
 
   @keyframes qrButtonRipple {
     0% {
       transform: scale(1);
-      opacity: 0.6;
-    }
-    50% {
-      opacity: 0.3;
+      opacity: 0.45;
     }
     100% {
-      transform: scale(1.15);
+      transform: scale(1.45);
       opacity: 0;
     }
   }
@@ -201,7 +196,6 @@ document.head.appendChild(styleSheet);
 //         const easeOutT = 1 - Math.pow(1 - t, 3); // Cubic ease out
         
 //         groupRef.current.position.lerpVectors(startPos, targetPos, easeOutT);
-        
 //         if (t < 1) {
 //           requestAnimationFrame(animate);
 //         }
@@ -1193,18 +1187,22 @@ export default function App() {
               {/* Ripple Borders */}
               {showRipple && (
                 <>
-                  {[...Array(4)].map((_, index) => (
+                  {[...Array(5)].map((_, index) => (
               <motion.div
                       key={`ripple-${index}`}
           style={{
             position: "absolute",
-                        inset: -3 - (index * 0.6),
-                        border: `2px solid ${image === DEFAULT_IMAGE ? "#6EC2FF" : "#45FF02"}`,
-                        borderRadius: "1px",
-                        opacity: 0.35,
-                        animation: `rippleAnimation 1.6s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.15}s infinite`,
+                        inset: -3 ,
+                        border: `${2 - (index * 0.15)}px  solid ${image === DEFAULT_IMAGE ? "#6EC2FF" : "#45FF02"}`,
+                        borderRadius: "4px",
+                        opacity: 0,
+                        animation: `rippleAnimation ${1.4 + (index * 0.2)}s cubic-bezier(0.4, 0, 0.2, 1) ${
+            index * 0.15
+          }s forwards`,
                         pointerEvents: "none",
                         zIndex: 3,
+                        transform: `scale(1)`,  
+                        willChange: "transform, opacity", 
                         transition: 'all 0.3s ease-out'
                       }}
                     />
@@ -1328,7 +1326,7 @@ export default function App() {
                         }}
           style={{
             position: "absolute",
-            left: "50%",
+            left: "45%",
                           top: "calc(100% + 60px)",
                           transform: "translateX(-50%)",
                           width: "40px",
@@ -1545,9 +1543,8 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3, delay: 0.1 }}
                       style={{
-                        width: "65px",
-                        height: "65px",
-                        borderRadius: "50%",
+                        width: "60px",
+                        height: "60px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1555,30 +1552,32 @@ export default function App() {
                         opacity: isProcessing ? 0.7 : 1,
                         position: "absolute",
                         bottom: "-150px",
-                        left: "43%",
-                        zIndex: 10,
+                        left: isMobile ? "40%" : "43%",
                         transform: "translateX(-50%)",
-                        overflow: "visible"
+                        zIndex: 10
                       }}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const rippleContainer = e.currentTarget;
+                        if (isProcessing) return;
                         
-                        // Create multiple ripples for a more natural effect
+                        const button = e.currentTarget;
+                        
+                        // Create multiple ripples with different delays
                         [0, 1, 2].forEach((i) => {
                           const ripple = document.createElement('div');
-                          ripple.style.position = 'absolute';
-                          ripple.style.top = '0';
-                          ripple.style.left = '0';
-                          ripple.style.right = '0';
-                          ripple.style.bottom = '0';
-                          ripple.style.border = '1.5px solid rgba(255, 255, 255, 0.85)';
-                          ripple.style.borderRadius = '50%';
-                          ripple.style.animation = `qrButtonRipple 1s cubic-bezier(0.25, 0.35, 0.25, 0.8) ${i * 0.15}s`;
-                          ripple.style.pointerEvents = 'none';
-                          rippleContainer.appendChild(ripple);
-                          setTimeout(() => ripple.remove(), 1000 + (i * 150));
+                          ripple.style.cssText = `
+                            position: absolute;
+                            width: 60px;
+                            height: 60px;
+                            background: rgba(255, 255, 255, ${0.45 - (i * 0.1)});
+                            border-radius: 50%;
+                            pointer-events: none;
+                            animation: qrButtonRipple 0.6s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.12}s forwards;
+                          `;
+                          
+                          button.appendChild(ripple);
+                          setTimeout(() => ripple.remove(), 600 + (i * 120));
                         });
                         
                         handleGenerateQR();
@@ -1590,9 +1589,7 @@ export default function App() {
                         style={{
                           width: "60px",
                           height: "60px",
-                          pointerEvents: "none",
-                          position: "relative",
-                          zIndex: 2
+                          pointerEvents: "none"
                         }}
                       />
                     </motion.div>
@@ -1761,7 +1758,7 @@ export default function App() {
                     </div>
                     
                     {/* QR Image below 3D model */}
-                    <motion.div
+                    {/* <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: 0.3 }}
@@ -1783,7 +1780,7 @@ export default function App() {
                           objectFit: "contain"
                         }}
                       />
-                    </motion.div>
+                    </motion.div> */}
                   </motion.div>
                 )}
 
