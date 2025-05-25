@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 // import { FaGlobeAmericas } from "react-icons/fa";
 // import ImageVariations from './components/ImageVariations';
 import DialUpContainer from './components/DialUpContainer';
-import { Canvas } from '@react-three/fiber';
-import { useGLTF, PerspectiveCamera } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useGLTF, PerspectiveCamera, OrbitControls } from '@react-three/drei';
 // import * as THREE from 'three';
 
 const DEFAULT_IMAGE = "/face.png";
@@ -262,18 +262,47 @@ document.head.appendChild(styleSheet);
 // }
 
 // Simpler model without drag functionality - we'll handle dragging differently
-function ModelDisplay() {
+function ModelDisplay({ onRotation }) {
   const { scene } = useGLTF('/track-ball-3d.glb');
   const modelRef = useRef();
-  
+  const controlsRef = useRef();
+
+  useFrame(() => {
+    if (controlsRef.current && onRotation) {
+      // Get the actual rotation from OrbitControls
+      const azimuthalAngle = controlsRef.current.getAzimuthalAngle();
+      const polarAngle = controlsRef.current.getPolarAngle();
+      
+      // Normalize angles to 0-1 range
+      const normalizedRotation = {
+        x: ((polarAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (2 * Math.PI),
+        y: ((azimuthalAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (2 * Math.PI)
+      };
+      
+      onRotation(normalizedRotation);
+    }
+  });
+
   return (
-    <group ref={modelRef} position={[0, 0, 0]}>
-      <primitive 
-        object={scene} 
-        scale={0.3}
-        rotation={[0, 0, 0]}
+    <>
+      <OrbitControls
+        ref={controlsRef}
+        enableZoom={false}
+        enablePan={false}
+        minPolarAngle={Math.PI / 4}
+        maxPolarAngle={Math.PI * 3 / 4}
+        rotateSpeed={0.5}
+        dampingFactor={0.05}
+        enableDamping={true}
       />
-    </group>
+      <mesh ref={modelRef}>
+        <primitive 
+          object={scene} 
+          scale={0.3}
+          position={[0, 0, 0]}
+        />
+      </mesh>
+    </>
   );
 }
 
@@ -1602,7 +1631,7 @@ export default function App() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-      style={{
+                    style={{
                       position: "absolute",
                       width: isMobile ? boxSize : boxSize * 0.9,
                       height: boxSize * 0.9,
@@ -1615,41 +1644,6 @@ export default function App() {
                       boxSizing: "border-box"
                     }}
                   >
-                    {/* Side Icons */}
-                    {showSideIcons && (
-                      <>
-                        <motion.img
-                          src="/images/icn1.png"
-                          alt="Icon 1"
-                          initial={{ x: "50%", y: "50%", opacity: 0, scale: 0.5 }}
-                          animate={{ x: "-120%", y: "50%", opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
-                          style={{
-                            position: "absolute",
-                            width: "50px",
-                            height: "50px",
-                            transform: "translate(-50%, -50%)",
-                            cursor: "pointer"
-                          }}
-                        />
-                        <motion.img
-                          src="/images/icn2.png"
-                          alt="Icon 2"
-                          initial={{ x: "50%", y: "50%", opacity: 0, scale: 0.5 }}
-                          animate={{ x: "220%", y: "50%", opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
-                          style={{
-                            position: "absolute",
-                            width: "50px",
-                            height: "50px",
-                            transform: "translate(-50%, -50%)",
-                            cursor: "pointer"
-                          }}
-                        />
-                      </>
-                    )}
-
-                    {/* Existing 3D model content */}
                     <div 
                       style={{ 
                         width: "100%", 
@@ -1666,34 +1660,14 @@ export default function App() {
                         background: "transparent",
                         clipPath: "circle(42% at center)",
                       }}
-                      onMouseDown={handleMouseDown}
-                      onTouchStart={handleTouchStart}
-                      onContextMenu={(e) => e.preventDefault()}
                     >
-                      {/* Add an invisible circular overlay to control the draggable area */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          pointerEvents: "none",
-                          borderRadius: "50%",
-                          border: "2px solid #40ff00",
-                          boxSizing: "border-box",
-                          width: "90%",
-                          height: "90%",
-                          margin: "auto"
-                        }}
-                      />
-                      
                       <Canvas
                         style={{ 
                           width: "100%", 
                           height: "100%",
                           touchAction: "none",
-                          userSelect: "none"
+                          userSelect: "none",
+                          cursor: "grab"
                         }}
                       >
                         <React.Suspense fallback={null}>
@@ -1709,78 +1683,20 @@ export default function App() {
                             near={0.1}
                             far={1000}
                           />
-                          
-                          {/* Visual position indicator */}
-                          <mesh 
-                            position={[dragPosition.x * 3, dragPosition.y * 3, 2]} 
-                            castShadow
-                          >
-                            <sphereGeometry args={[0.2, 16, 16]} />
-                            <meshStandardMaterial 
-                              color={Math.sqrt(dragPosition.x*dragPosition.x + dragPosition.y*dragPosition.y) <= 1.0 ? "#40ff00" : "#ff4000"} 
-                              emissive={Math.sqrt(dragPosition.x*dragPosition.x + dragPosition.y*dragPosition.y) <= 1.0 ? "#40ff00" : "#ff4000"} 
-                              emissiveIntensity={0.5} 
-                            />
-                          </mesh>
-                          
-                          {/* Boundary circle */}
-                          <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-                            <ringGeometry args={[2.95, 3.05, 64]} />
-                            <meshBasicMaterial color="#40ff00" opacity={0.8} transparent={true} />
-                          </mesh>
 
-                          {/* Inner boundary circle to help guide the user */}
-                          <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.1]}>
-                            <ringGeometry args={[2.7, 2.85, 64]} />
-                            <meshBasicMaterial color="#ffffff" opacity={0.5} transparent={true} />
-                          </mesh>
-                          
-                          {/* Use simpler model without dragging */}
-                          <ModelDisplay />
+                          <ModelDisplay onRotation={(rotation) => {
+                            const totalVariations = variations.length;
+                            const angleSum = (rotation.x + rotation.y) / 2;
+                            const variationIndex = Math.floor(angleSum * totalVariations);
+                            const safeIndex = Math.abs(variationIndex % totalVariations);
+                            
+                            if (variations[safeIndex] && variations[safeIndex].processedImageData) {
+                              setImage(variations[safeIndex].processedImageData);
+                            }
+                          }} />
                         </React.Suspense>
                       </Canvas>
-                      
-                      {/* Overlay hint text */}
-                      <div style={{
-                        position: "absolute",
-                        top: "50%",
-                        left: "50%",
-                        transform: "translate(-50%, -50%)",
-                        color: "white",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        textShadow: "0 0 5px rgba(0,0,0,0.8)",
-                        pointerEvents: "none",
-                        opacity: 0
-                      }}>
-                        Drag here
-  </div>
                     </div>
-                    
-                    {/* QR Image below 3D model */}
-                    {/* <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.3 }}
-                      style={{
-                        position: "absolute",
-                        left: "50%",
-                        bottom: "-100px",
-                        transform: "translateX(-50%)",
-                        cursor: "pointer"
-                      }}
-                      onClick={() => setShowSideIcons(true)}
-                    >
-                      <img
-                        src="/images/QR.png"
-                        alt="QR"
-                        style={{
-                          width: "60px",
-                          height: "60px",
-                          objectFit: "contain"
-                        }}
-                      />
-                    </motion.div> */}
                   </motion.div>
                 )}
 
