@@ -1,14 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-// import ImageBox from "./components/ImageBox";
-// import MainUI from "./components/MainUI";
-// import AnimatedTypography from './components/AnimatedTypography';
-// import { FaGlobeAmericas } from "react-icons/fa";
-// import ImageVariations from './components/ImageVariations';
 import DialUpContainer from './components/DialUpContainer';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, PerspectiveCamera, OrbitControls } from '@react-three/drei';
-// import * as THREE from 'three';
 
 const DEFAULT_IMAGE = "/face.png";
 
@@ -288,7 +282,7 @@ function ModelDisplay({ onRotation }) {
   // Set camera closer to fill the viewport completely
   useEffect(() => {
     if (camera) {
-      camera.position.z = 3.5; // Move camera closer for larger appearance
+      camera.position.z = 7; // Move camera closer for larger appearance
       camera.updateProjectionMatrix();
     }
   }, [camera]);
@@ -310,7 +304,7 @@ function ModelDisplay({ onRotation }) {
     
     // Enlarged scale to fill the entire circle
     if (modelRef.current) {
-      modelRef.current.scale.set(0.35, 0.35, 0.35); // Larger to fill the circle
+      modelRef.current.scale.set(0.6, 0.6, 0.6); // Larger to fill the circle
     }
   });
 
@@ -367,6 +361,8 @@ function App() {
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const [debugInfo, setDebugInfo] = useState({ x: 0, y: 0 });
   const [imageClickEnabled, setImageClickEnabled] = useState(true);
+  const [showQRRipple, setShowQRRipple] = useState(false);
+  const [userUrl, setUserUrl] = useState("");
   const isDraggingRef = useRef(false);
   const processingCompleteRef = useRef(false);
   const API_BASE_URL = process.env.NODE_ENV === 'development' 
@@ -387,12 +383,10 @@ function App() {
     let timer;
     if (phase === "text") {
       timer = setTimeout(() => {
-        // setShowImage(true);
         setPhase("image");
       }, 2000); // Show text for 2 seconds
     } else if (phase === "image") {
       timer = setTimeout(() => {
-        // setShowBorder(true);
         setPhase("border");
       }, 2000); // Show image for 2 seconds before border
     }
@@ -409,7 +403,7 @@ function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // CSS keyframes for the ripple animation
+  // CSS keyframes for animations
   useEffect(() => {
     const styleSheet = document.createElement("style");
     styleSheet.textContent = `
@@ -429,6 +423,102 @@ function App() {
           opacity: 0;
         }
       }
+      
+      @keyframes glowPulse {
+        0% {
+          box-shadow: 0 0 0 0.5px rgba(64, 255, 0, 1);
+        }
+        50% {
+          box-shadow: 0 0 0 4px rgba(64, 255, 0, 0.5);
+        }
+        100% {
+          box-shadow: 0 0 0 0.5px rgba(64, 255, 0, 1);
+        }
+      }
+      
+      @keyframes processingOverlay {
+        0% {
+          transform: translateX(-100%);
+          opacity: 0;
+        }
+        20% {
+          opacity: 1;
+        }
+        80% {
+          opacity: 1;
+        }
+        100% {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+
+      @keyframes subtlePulse {
+        0%, 100% {
+          opacity: 1;
+          filter: brightness(1);
+        }
+        50% {
+          opacity: 0.92;
+          filter: brightness(0.97);
+        }
+      }
+      
+      @keyframes scanEffect {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      @keyframes qrButtonRipple {
+        0% {
+          transform: scale(1);
+          opacity: 0.6;
+        }
+        50% {
+          opacity: 0.3;
+        }
+        100% {
+          transform: scale(1.5);
+          opacity: 0;
+        }
+      }
+
+      .scanning-overlay {
+        position: absolute;
+        top: 0;
+        left: -50%;
+        width: 200%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent 0%,
+          transparent 35%,
+          rgba(255, 255, 255, 0.4) 45%,
+          rgba(255, 255, 255, 0.9) 50%,
+          rgba(255, 255, 255, 0.4) 55%,
+          transparent 65%,
+          transparent 100%
+        );
+        transform: translateX(-100%);
+        mix-blend-mode: overlay;
+      }
+
+      .scanning-overlay.active {
+        animation: scanEffect 4s cubic-bezier(0.4, 0.0, 0.2, 1) infinite;
+      }
+
+      @keyframes imageDim {
+        0%, 100% {
+          filter: brightness(0.9) contrast(1.1);
+        }
+        50% {
+          filter: brightness(0.85) contrast(1.15);
+        }
+      }
     `;
     document.head.appendChild(styleSheet);
     return () => document.head.removeChild(styleSheet);
@@ -437,11 +527,11 @@ function App() {
   // Show icon after image loads
   useEffect(() => {
     if (image !== DEFAULT_IMAGE && !loading && !show3DModel) {
-    const timer = setTimeout(() => {
+      const timer = setTimeout(() => {
         setShowIcon(true);
         setShowDialUp(false); // Ensure DialUp is hidden when image is first loaded
-    }, 1000);
-    return () => clearTimeout(timer);
+      }, 1000);
+      return () => clearTimeout(timer);
     } else {
       setShowIcon(false);
       setShowUrlInput(false);
@@ -449,7 +539,7 @@ function App() {
     }
   }, [image, loading, show3DModel]);
 
-  // Modify the useEffect for showing URL input after icon appears
+  // Show URL input after icon appears
   useEffect(() => {
     if (showIcon && !show3DModel) {
       const timer = setTimeout(() => {
@@ -462,12 +552,7 @@ function App() {
   // Handle image click and file selection
   const handleImageClick = async (e) => {
     // Prevent click if we clicked on a child element that handles its own events
-    if (e.target !== e.currentTarget) {
-      return;
-    }
-    
-    // Don't open file picker if image clicking is disabled
-    if (!imageClickEnabled) {
+    if (e.target !== e.currentTarget || !imageClickEnabled) {
       return;
     }
     
@@ -531,14 +616,11 @@ function App() {
           const formData = new FormData();
           formData.append("file", compressedFile);
 
-          console.log('Starting file upload...');
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000);
 
           let res;
-          // Use relative URL that will be proxied through Vercel
           try {
-            console.log('Making API request through Vercel proxy...');
             res = await fetch(`${API_BASE_URL}/api/v1/uploadFile`, {
               method: "POST",
               body: formData,
@@ -548,34 +630,24 @@ function App() {
               signal: controller.signal
             });
           } catch (error) {
-            console.error('API request failed:', error);
             throw error;
           }
 
           clearTimeout(timeoutId);
   
           if (!res.ok) {
-            const errorText = await res.text();
-            console.error('Server response:', {
-              status: res.status,
-              statusText: res.statusText,
-              responseText: errorText
-            });
-            throw new Error(`HTTP error! status: ${res.status}, message: ${errorText}`);
+            throw new Error(`HTTP error! status: ${res.status}`);
           }
   
           const data = await res.json();
-          console.log('Raw API Response:', data);
 
           // Store the fileId from the response
           if (!data || !data.fileId) {
-            console.error('Invalid response format:', data);
             throw new Error('Invalid response format: missing fileId');
           }
 
           // Store the fileId
           setFileId(data.fileId);
-          console.log('Received fileId:', data.fileId);
 
           // Handle the image data - updated to handle both base64 and array data
           let imageData;
@@ -595,7 +667,6 @@ function App() {
           }
 
           if (!imageData) {
-            console.error('No valid image data in response:', data);
             throw new Error('No valid image data in response');
           }
 
@@ -606,11 +677,10 @@ function App() {
             setShowRipple(true);
             setShowDialUp(false); // Explicitly ensure DialUp is hidden for new images
             setTimeout(() => setShowRipple(false), 1000);
-        setLoading(false);
+            setLoading(false);
           };
 
-          preloadImage.onerror = (error) => {
-            console.error('Image loading error:', error);
+          preloadImage.onerror = () => {
             setLoading(false);
             alert('Failed to load the image. Please try again.');
           };
@@ -619,7 +689,6 @@ function App() {
           const imageUrl = `data:image/jpeg;base64,${imageData}`;
           preloadImage.src = imageUrl;
         } catch (error) {
-          console.error('Upload error:', error);
           if (error.name === 'AbortError') {
             alert('Upload timed out. Please try again.');
           } else {
@@ -641,7 +710,6 @@ function App() {
   // Move the processing logic to a new function
   const handleGenerateQR = async () => {
     if (!fileId) {
-      console.error('No file ID available');
       alert('Please upload an image first');
       return;
     }
@@ -649,20 +717,19 @@ function App() {
     setIsProcessing(true);
     setShowDialUp(false); // Ensure DialUp is hidden during processing
     try {
-      console.log('Generating variations for fileId:', fileId);
       let response;
       
-      // Use relative URL that will be proxied through Vercel
+      // Use the user-provided URL or default to "abc"
+      const targetUrl = userUrl.trim() || "abc";
+      
       try {
-        console.log('Making variations API request through Vercel proxy...');
-        response = await fetch(`${API_BASE_URL}/api/v1/generate/${fileId}/abc`, {
+        response = await fetch(`${API_BASE_URL}/api/v1/generate/${fileId}/${targetUrl}`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
           }
         });
       } catch (error) {
-        console.error('API request failed for variations:', error);
         throw error;
       }
 
@@ -671,7 +738,6 @@ function App() {
       }
 
       const variations = await response.json();
-      console.log("Raw API Response:", variations);
       
       if (Array.isArray(variations) && variations.length > 0) {
         // Process and store variations
@@ -700,18 +766,14 @@ function App() {
         setVariations(validVariations);
         
         // Find the original image (with default brightness and contrast)
-        // Default values are typically 0.5 for both brightness (b) and contrast (c)
-        // Look for values closest to default if exact match not found
         const originalImage = validVariations.find(v => 
           (v.settings.b === 0.5 && v.settings.c === 0.5) || 
           (Math.abs(v.settings.b - 0.5) < 0.1 && Math.abs(v.settings.c - 0.5) < 0.1)
         );
         
         if (originalImage) {
-          // Update the displayed image with the original variation
           setImage(originalImage.processedImageData);
         } else if (validVariations.length > 0) {
-          // If no "original" found, use the first variation
           setImage(validVariations[0].processedImageData);
         }
       } else {
@@ -726,7 +788,6 @@ function App() {
       setShowDialUp(false);
 
     } catch (error) {
-      console.error('Error processing image:', error);
       alert('Failed to process image. Please try again.');
     } finally {
       setIsProcessing(false);
@@ -1108,9 +1169,6 @@ function App() {
   //   setImage(imageUrl);
   // };
 
-  // Add state for Generate QR button ripple
-  const [showQRRipple, setShowQRRipple] = useState(false);
-
   // Update the handleGenerateQRClick function to use the white ripple effect
   const handleGenerateQRClick = (e) => {
     e.preventDefault();
@@ -1399,8 +1457,8 @@ function App() {
                         }}
                         style={{
                           position: "absolute",
-                          left: "50%", // Changed from 45% to 50% for perfect centering
-                          top: "calc(100% + 60px)",
+                          left: "45%", // Changed from 45% to 50% for perfect centering
+                          top: "calc(100% + 65px)",
                           transform: "translateX(-50%)",
                           width: "40px",
                           height: "40px",
@@ -1491,6 +1549,8 @@ function App() {
                               transition={{ duration: 0.3, delay: 0.2 }}
                               type="text"
                               placeholder="URL:"
+                              value={userUrl}
+                              onChange={(e) => setUserUrl(e.target.value)}
                               style={{
                                 flex: 1,
                                 border: "none",

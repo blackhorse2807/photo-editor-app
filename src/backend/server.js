@@ -35,7 +35,6 @@ app.use(
 
 // CORS setup (supporting frontend on Vercel and local dev)
 const allowedOrigins = [
-  'https://algonomic-ai.vercel.app',
   'http://localhost:3000',
   'https://photo-editor-app-ecru.vercel.app'
 ];
