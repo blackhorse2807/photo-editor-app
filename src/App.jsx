@@ -449,13 +449,13 @@ function App() {
     }
   }, [image, loading, show3DModel]);
 
-  // Show URL input after icon appears
+  // Modify the useEffect for showing URL input after icon appears
   useEffect(() => {
     if (showIcon && !show3DModel) {
-    const timer = setTimeout(() => {
+      const timer = setTimeout(() => {
         setShowUrlInput(true);
-      }, 2000);
-    return () => clearTimeout(timer);
+      }, 1000); // Reduced from 2000ms to 1000ms for quicker transition
+      return () => clearTimeout(timer);
     }
   }, [showIcon, show3DModel]);
 
@@ -1378,7 +1378,7 @@ function App() {
           </motion.div>
 
               {/* Icon and URL Input */}
-              <AnimatePresence>
+              <AnimatePresence mode="crossfade">
                 {showIcon && !showProcessButtons && !show3DModel && (
                   <>
                     {!showUrlInput ? (
@@ -1386,67 +1386,68 @@ function App() {
                         initial={{ opacity: 0, y: 0 }}
                         animate={{ 
                           opacity: 1, 
-                          y: 20
+                          y: 20 
                         }}
                         exit={{ 
                           opacity: 0,
-                          scale: 0.9,
-                          transition: { duration: 0.2 }
+                          y: 20,
+                          transition: { duration: 0.3 }
                         }}
                         transition={{ 
-                          duration: 0.8,
+                          duration: 0.5,
                           ease: "easeOut"
                         }}
-          style={{
-            position: "absolute",
-            left: "45%",
+                        style={{
+                          position: "absolute",
+                          left: "50%", // Changed from 45% to 50% for perfect centering
                           top: "calc(100% + 60px)",
                           transform: "translateX(-50%)",
                           width: "40px",
                           height: "40px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                           cursor: "pointer",
                           zIndex: 10,
-                  }}
-                >
-                  <img
+                        }}
+                      >
+                        <img
                           src="/images/icon-below-image.png" 
                           alt="Icon" 
-                style={{
+                          style={{
                             width: "32px",
                             height: "32px",
                             objectFit: "contain"
                           }}
-                  />
-                </motion.div>
+                        />
+                      </motion.div>
                     ) : (
                       <div style={{ 
                         position: "absolute",
-                        top: "calc(100% + 80px)",
+                        top: "calc(100% + 60px)", // Changed from 80px to 60px to match icon position
                         left: "50%",
                         transform: "translateX(-50%)",
                         display: "flex",
                         width: isMobile ? "310px" : "600px",
                         height: "100px",
                         margin: "0 auto",
-                        flexDirection: isMobile ? "row" : "row"
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center"
                       }}>
                         <motion.div
-                          initial={{ x: 200, opacity: 0, scale: 0.8 }}
+                          initial={{ x: 0, opacity: 0, scale: 0.9 }}
                           animate={{ x: 0, opacity: 1, scale: 1 }}
                           transition={{
-                            duration: 0.6,
-                            ease: [0.4, 0, 0.2, 1],
-                            opacity: { duration: 0.4 }
+                            duration: 0.4,
+                            ease: "easeOut",
                           }}
-            style={{
+                          style={{
                             width: "32px",
                             height: "32px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                             borderRadius: "1px"
                           }}
                         >
@@ -1460,13 +1461,13 @@ function App() {
                             }}
                           />
                         </motion.div>
-                <motion.div
+                        <motion.div
                           initial={{ width: 0, opacity: 0 }}
                           animate={{ width: "calc(100% - 32px)", opacity: 1 }}
                           transition={{
-                            duration: 0.6,
+                            duration: 0.5,
                             ease: [0.4, 0, 0.2, 1],
-                            opacity: { duration: 0.3, delay: 0.2 }
+                            opacity: { duration: 0.3, delay: 0.1 }
                           }}
                           style={{
                             height: "32px",
@@ -1487,7 +1488,7 @@ function App() {
                             <motion.input
                               initial={{ width: 0, opacity: 0 }}
                               animate={{ width: "100%", opacity: 1 }}
-                              transition={{ duration: 0.3, delay: 0.4 }}
+                              transition={{ duration: 0.3, delay: 0.2 }}
                               type="text"
                               placeholder="URL:"
                               style={{
