@@ -1556,7 +1556,7 @@ function App() {
                               position: "absolute",
                               left: "50%",
                               transform: "translateX(-50%)",
-                              top: "calc(50% + 5px)"
+                              top: "calc(50% + 30px)"
                             }}
                             onClick={handleProcessClick}
                             type="button"
