@@ -30,18 +30,33 @@ const animationStyles = `
       border-width: 1.5px;
     }
   }
-
+  
   @keyframes qrButtonRipple {
     0% {
       transform: scale(1);
-      opacity: 0.45;
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 0.3;
     }
     100% {
-      transform: scale(1.45);
+      transform: scale(1.5);
       opacity: 0;
     }
   }
 `;
+
+const RippleEffect = ({ showRipple, image, DEFAULT_IMAGE }) => {
+  useEffect(() => {
+    const styleTag = document.createElement("style");
+    styleTag.innerHTML = animationStyles;
+    document.head.appendChild(styleTag);
+
+    return () => {
+      document.head.removeChild(styleTag);
+    };
+  }, []);
+};
 
 const styleSheet = document.createElement("style");
 styleSheet.innerText = animationStyles;
@@ -267,6 +282,17 @@ function ModelDisplay({ onRotation }) {
   const modelRef = useRef();
   const controlsRef = useRef();
 
+  // Get the camera to adjust its position
+  const { camera } = useThree();
+  
+  // Set camera closer to fill the viewport completely
+  useEffect(() => {
+    if (camera) {
+      camera.position.z = 3.5; // Move camera closer for larger appearance
+      camera.updateProjectionMatrix();
+    }
+  }, [camera]);
+
   useFrame(() => {
     if (controlsRef.current && onRotation) {
       // Get the actual rotation from OrbitControls
@@ -281,10 +307,23 @@ function ModelDisplay({ onRotation }) {
       
       onRotation(normalizedRotation);
     }
+    
+    // Enlarged scale to fill the entire circle
+    if (modelRef.current) {
+      modelRef.current.scale.set(0.35, 0.35, 0.35); // Larger to fill the circle
+    }
   });
 
   return (
     <>
+      <PerspectiveCamera
+        makeDefault
+        position={[0, 0, 7]}
+        fov={25}
+        near={0.1}
+        far={1000}
+      />
+      
       <OrbitControls
         ref={controlsRef}
         enableZoom={false}
@@ -295,10 +334,13 @@ function ModelDisplay({ onRotation }) {
         dampingFactor={0.05}
         enableDamping={true}
       />
+      
+      <ambientLight intensity={1.2} />
+      
       <mesh ref={modelRef}>
         <primitive 
           object={scene} 
-          scale={0.3}
+          scale={0.6} // Enlarged to fill the circle
           position={[0, 0, 0]}
         />
       </mesh>
@@ -306,7 +348,7 @@ function ModelDisplay({ onRotation }) {
   );
 }
 
-export default function App() {
+function App() {
   const [phase, setPhase] = useState("text");
   const [image, setImage] = useState(DEFAULT_IMAGE);
   const [loading, setLoading] = useState(false);
@@ -1069,10 +1111,12 @@ export default function App() {
   // Add state for Generate QR button ripple
   const [showQRRipple, setShowQRRipple] = useState(false);
 
-  // Handle Generate QR button click with ripple
+  // Update the handleGenerateQRClick function to use the white ripple effect
   const handleGenerateQRClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isProcessing) return;
+    
     setShowQRRipple(true);
     setTimeout(() => setShowQRRipple(false), 600);
     handleGenerateQR();
@@ -1585,33 +1629,31 @@ export default function App() {
                         transform: "translateX(-50%)",
                         zIndex: 10
                       }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (isProcessing) return;
-                        
-                        const button = e.currentTarget;
-                        
-                        // Create multiple ripples with different delays
-                        [0, 1, 2].forEach((i) => {
-                          const ripple = document.createElement('div');
-                          ripple.style.cssText = `
-                            position: absolute;
-                            width: 60px;
-                            height: 60px;
-                            background: rgba(255, 255, 255, ${0.45 - (i * 0.1)});
-                            border-radius: 50%;
-                            pointer-events: none;
-                            animation: qrButtonRipple 0.6s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.12}s forwards;
-                          `;
-                          
-                          button.appendChild(ripple);
-                          setTimeout(() => ripple.remove(), 600 + (i * 120));
-                        });
-                        
-                        handleGenerateQR();
-                      }}
+                      onClick={handleGenerateQRClick}
                     >
+                      {/* White ripple effect for Generate QR Button */}
+                      {showQRRipple && (
+                        <>
+                          {[...Array(3)].map((_, index) => (
+                            <motion.div
+                              key={`qr-ripple-${index}`}
+                              style={{
+                                position: "absolute",
+                                inset: -3,
+                                border: `${2 - (index * 0.15)}px solid #FFFFFF`,
+                                borderRadius: "50%",
+                                opacity: 0,
+                                animation: `qrButtonRipple ${0.6 + (index * 0.15)}s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.1}s forwards`,
+                                pointerEvents: "none",
+                                zIndex: 3,
+                                transform: `scale(1)`,  
+                                willChange: "transform, opacity", 
+                                transition: 'all 0.3s ease-out'
+                              }}
+                            />
+                          ))}
+                        </>
+                      )}
                       <img
                         src="/images/GenerateQRBtn.png" 
                         alt="Generate QR" 
@@ -1633,17 +1675,51 @@ export default function App() {
                     transition={{ duration: 0.5 }}
                     style={{
                       position: "absolute",
-                      width: isMobile ? boxSize : boxSize * 0.9,
-                      height: boxSize * 0.9,
-                      top: isMobile ? "270px" : "320px",
-                      left: isMobile ? "5px" : "20px",
+                      width: isMobile ? boxSize*0.8 : boxSize * 0.6,
+                      height: isMobile ? boxSize*0.8 : boxSize * 0.6,
+                      top: isMobile ? "300px" : "360px",
+                      left: isMobile ? "20px" : "60px",
                       transform: "translate(-50%, -50%)",
                       zIndex: 100,
                       overflow: "visible",
-                      borderRadius: "4px",
+                      // borderRadius: "4px",
                       boxSizing: "border-box"
                     }}
                   >
+                    {/* Drop shadow behind the trackball */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: "84%",  // Exactly match clipPath size (42% * 2)
+                        height: "84%",
+                        borderRadius: "50%",
+                        boxShadow: "0 0 0 1.5px #44FF00E5, 0 0 8px 6px rgba(68, 255, 0, 0.25), 0 0 16px 12px rgba(68, 255, 0, 0.15)",
+                        opacity: 0.7,
+                        zIndex: 999, // Just under the trackball
+                        pointerEvents: "none",
+                      }}
+                    />
+                    
+                    {/* Additional perfect-fit ring */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: "84%", // Match exact clipPath size
+                        height: "84%",
+                        borderRadius: "50%",
+                        border: "1px solid #44FF00E5",
+                        opacity: 0.6,
+                        zIndex: 999, // Just under the trackball
+                        pointerEvents: "none",
+                      }}
+                    />
+                    
                     <div 
                       style={{ 
                         width: "100%", 
@@ -1659,6 +1735,7 @@ export default function App() {
                         borderRadius: "0",
                         background: "transparent",
                         clipPath: "circle(42% at center)",
+                        zIndex: 1000
                       }}
                     >
                       <Canvas
@@ -1669,6 +1746,7 @@ export default function App() {
                           userSelect: "none",
                           cursor: "grab"
                         }}
+                        camera={{ position: [0, 0, 7], fov: 25 }} // Adjusted for larger model
                       >
                         <React.Suspense fallback={null}>
                           <ambientLight intensity={1.5} />
@@ -1676,14 +1754,6 @@ export default function App() {
                           <spotLight position={[-5, 5, 5]} intensity={1} />
                           <spotLight position={[0, -5, 5]} intensity={0.8} />
                           
-                          <PerspectiveCamera
-                            makeDefault
-                            position={[0, 0, 18]}
-                            fov={15}
-                            near={0.1}
-                            far={1000}
-                          />
-
                           <ModelDisplay onRotation={(rotation) => {
                             const totalVariations = variations.length;
                             const angleSum = (rotation.x + rotation.y) / 2;
@@ -1726,3 +1796,4 @@ export default function App() {
     </motion.div>
   );
 }
+export default App;
