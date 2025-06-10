@@ -137,8 +137,18 @@ function App() {
   const [imageClickEnabled, setImageClickEnabled] = useState(true);
   const [showQRRipple, setShowQRRipple] = useState(false);
   const [userUrl, setUserUrl] = useState("");
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [minZoom, setMinZoom] = useState(1);
+  const [clearWindowPosition, setClearWindowPosition] = useState({ x: 50, y: 50 });
+  const [isFrozen, setIsFrozen] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
   const isDraggingRef = useRef(false);
   const processingCompleteRef = useRef(false);
+  const lastTouchDistanceRef = useRef(null);
+  const imageRef = useRef(null);
+  const containerRef = useRef(null);
+  const clearWindowRef = useRef(null);
+  const isDraggingWindowRef = useRef(false);
   const API_BASE_URL = 'https://tools.qrplus.ai';
 
   // Add new state for icon animations
@@ -383,89 +393,22 @@ function App() {
       if (file) {
         setLoading(true);
         try {
-          // Compress image before upload
+          // Compress image before displaying
           const compressedFile = await compressImage(file);
-          const formData = new FormData();
-          formData.append("file", compressedFile);
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-          let res;
-          try {
-            res = await fetch(`${API_BASE_URL}/api/v1/uploadFile`, {
-              method: "POST",
-              body: formData,
-              headers: {
-                'Accept': 'application/json'
-              },
-              signal: controller.signal
-            });
-          } catch (error) {
-            throw error;
-          }
-
-          clearTimeout(timeoutId);
-  
-          if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
-          }
-  
-          const data = await res.json();
-
-          // Store the fileId from the response
-          if (!data || !data.fileId) {
-            throw new Error('Invalid response format: missing fileId');
-          }
-
-          // Store the fileId
-          setFileId(data.fileId);
-
-          // Handle the image data - updated to handle both base64 and array data
-          let imageData;
-          if (data.contents) {
-            if (data.contents.type === "Buffer" && Array.isArray(data.contents.data)) {
-              // Convert array of bytes to base64 string
-              const uint8Array = new Uint8Array(data.contents.data);
-              const binaryString = uint8Array.reduce((str, byte) => str + String.fromCharCode(byte), '');
-              imageData = btoa(binaryString);
-            } else if (data.contents.Data) {
-              // Handle base64 Data field
-              imageData = data.contents.Data;
-            }
-          } else if (data.croppedImage) {
-            // Handle direct base64 format
-            imageData = data.croppedImage.replace(/^data:image\/\w+;base64,/, '');
-          }
-
-          if (!imageData) {
-            throw new Error('No valid image data in response');
-          }
-
-          const preloadImage = new Image();
-          preloadImage.onload = () => {
-            const imageUrl = `data:image/jpeg;base64,${imageData}`;
+          
+          // Create a URL for the compressed file
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const imageUrl = e.target.result;
             setImage(imageUrl);
             setShowRipple(true);
-            setShowDialUp(false); // Explicitly ensure DialUp is hidden for new images
+            setShowDialUp(false);
             setTimeout(() => setShowRipple(false), 1000);
             setLoading(false);
           };
-
-          preloadImage.onerror = () => {
-            setLoading(false);
-            alert('Failed to load the image. Please try again.');
-          };
-
-          // Set the image source
-          const imageUrl = `data:image/jpeg;base64,${imageData}`;
-          preloadImage.src = imageUrl;
+          reader.readAsDataURL(compressedFile);
         } catch (error) {
-          if (error.name === 'AbortError') {
-            alert('Upload timed out. Please try again.');
-          } else {
-            alert(`Upload failed: ${error.message}`);
-          }
+          alert(`Failed to process image: ${error.message}`);
           setLoading(false);
         }
       }
@@ -480,91 +423,196 @@ function App() {
   const blueCyan = "linear-gradient(to bottom, #2D87C7 0%, #002496 100%)";
 
   // Move the processing logic to a new function
-  const handleGenerateQR = async () => {
-    if (!fileId) {
-      alert('Please upload an image first');
-      return;
-    }
+  // 1. Update handleGenerateQR to remove redundant image data in payload
+const handleGenerateQR = async () => {
+  if (!image || image === DEFAULT_IMAGE) {
+    alert('Please upload or select an image first');
+    return;
+  }
 
-    setIsProcessing(true);
-    setShowDialUp(false); // Ensure DialUp is hidden during processing
-    try {
-      let response;
-      
-      // Use the user-provided URL or default to "abc"
-      const targetUrl = userUrl.trim() || "abc";
-      
-      try {
-        response = await fetch(`${API_BASE_URL}/api/v1/generate/${fileId}/${targetUrl}`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-      } catch (error) {
-        throw error;
-      }
+  setIsProcessing(true);
+  setShowDialUp(false);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const variations = await response.json();
-      
-      if (Array.isArray(variations) && variations.length > 0) {
-        // Process and store variations
-        const processedVariations = variations.map(variation => {
-          let base64Data;
-          if (variation.imageData && typeof variation.imageData === 'object') {
-            if (variation.imageData.type === 'Buffer' && Array.isArray(variation.imageData.data)) {
-              const uint8Array = new Uint8Array(variation.imageData.data);
-              const binaryString = uint8Array.reduce((str, byte) => str + String.fromCharCode(byte), '');
-              base64Data = btoa(binaryString);
-            } else if (variation.imageData.Data) {
-              base64Data = variation.imageData.Data;
-            }
-          } else if (typeof variation.imageData === 'string') {
-            base64Data = variation.imageData.replace(/^data:image\/\w+;base64,/, '');
-          }
-
-          return {
-            ...variation,
-            processedImageData: base64Data ? `data:image/jpeg;base64,${base64Data}` : null
-          };
-        });
-
-        // Store all the processed variations for later use
-        const validVariations = processedVariations.filter(v => v.processedImageData !== null);
-        setVariations(validVariations);
-        
-        // Find the original image (with default brightness and contrast)
-        const originalImage = validVariations.find(v => 
-          (v.settings.b === 0.5 && v.settings.c === 0.5) || 
-          (Math.abs(v.settings.b - 0.5) < 0.1 && Math.abs(v.settings.c - 0.5) < 0.1)
-        );
-        
-        if (originalImage) {
-          setImage(originalImage.processedImageData);
-        } else if (validVariations.length > 0) {
-          setImage(validVariations[0].processedImageData);
+  try {
+    // Get fileId from uploaded image
+    const fileId = await uploadImageAndGetFileId(image);
+    
+    // Use GET request with fileId in URL path as per API requirements
+    const targetUrl = userUrl.trim() || "abc";
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/generate/${fileId}/${targetUrl}`, 
+      {
+        method: 'GET', // Changed from POST to GET
+        headers: {
+          'Accept': 'application/json'
         }
-      } else {
-        throw new Error('Invalid response format or no variations received');
       }
+    );
 
-      // After processing is complete - clean up UI and show 3D model
-      setShow3DModel(true);
-      setShowProcessButtons(false);
-      setShowIcon(false);
-      setShowUrlInput(false);
-      setShowDialUp(false);
-
-    } catch (error) {
-      alert('Failed to process image. Please try again.');
-    } finally {
-      setIsProcessing(false);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
+
+    // Process the response
+    const variations = await response.json();
+    
+    console.log("Received variations:", variations);
+    
+    const processedVariations = variations.map((variation, index) => {
+      try {
+        // Handle different response formats
+        let base64Data = '';
+        
+        console.log(`Processing variation ${index}:`, variation);
+        
+        if (variation.imageData) {
+          if (typeof variation.imageData === 'string') {
+            // If it's already a string, use it directly
+            base64Data = variation.imageData.replace(/^data:image\/\w+;base64,/, '');
+            console.log(`Variation ${index}: Using string data`);
+          } else if (Array.isArray(variation.imageData)) {
+            // If it's an array of numbers, convert to base64
+            base64Data = bytesToBase64(variation.imageData);
+            console.log(`Variation ${index}: Converted array data, length: ${variation.imageData.length}`);
+          } else if (variation.imageData.data && Array.isArray(variation.imageData.data)) {
+            // If it has a data property with array
+            base64Data = bytesToBase64(variation.imageData.data);
+            console.log(`Variation ${index}: Converted data.array, length: ${variation.imageData.data.length}`);
+          } else if (variation.imageData.Data) {
+            // If it has a Data property
+            base64Data = variation.imageData.Data;
+            console.log(`Variation ${index}: Using Data property`);
+          } else {
+            console.warn(`Variation ${index}: Unknown imageData format:`, typeof variation.imageData);
+          }
+        } else {
+          console.warn(`Variation ${index}: No imageData property found`);
+        }
+        
+        const result = {
+          ...variation,
+          processedImageData: base64Data ? 
+            `data:image/jpeg;base64,${base64Data}` : 
+            null
+        };
+        
+        return result;
+      } catch (error) {
+        console.error(`Error processing variation ${index}:`, error);
+        return { ...variation, processedImageData: null };
+      }
+    });
+
+    // Filter out invalid variations
+    const validVariations = processedVariations.filter(v => v.processedImageData);
+    
+    console.log(`Processed ${processedVariations.length} variations, ${validVariations.length} valid`);
+    
+    if (validVariations.length === 0) {
+      throw new Error('No valid variations received');
+    }
+
+    // Update UI states
+    setVariations(validVariations);
+    setImage(validVariations[0].processedImageData);
+    setShow3DModel(true);
+    setShowProcessButtons(false);
+    setShowIcon(false);
+    setShowUrlInput(false);
+    setShowDialUp(false);
+
+  } catch (error) {
+    console.error('API Error:', error);
+    alert(`Failed to process image: ${error.message}`);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+// Function to handle large arrays that might exceed the apply limit
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunk = 1024;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const slice = bytes.slice(i, Math.min(i + chunk, bytes.length));
+    binary += String.fromCharCode.apply(null, slice);
+  }
+  return btoa(binary);
+}
+
+async function uploadImageAndGetFileId(image) {
+  try {
+    const file = base64ToFile(image, "image.jpg");
+    console.log("Uploading image...");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/uploadFile`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.fileId) {
+      throw new Error('No fileId in response');
+    }
+    
+    console.log("File uploaded successfully, fileId:", data.fileId);
+    setFileId(data.fileId); // Store fileId in state for future use
+    return data.fileId;
+
+  } catch (error) {
+    console.error('Upload Error:', error);
+    throw new Error('Image upload failed. Please try again.');
+  }
+}
+
+// 3. Add error boundaries and logging
+function base64ToFile(base64Data, filename) {
+  try {
+    // Validate input
+    if (!base64Data || typeof base64Data !== 'string') {
+      throw new Error('Invalid base64 data');
+    }
+
+    // Handle data URIs by removing the prefix
+    let cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+    
+    // Remove any line breaks and whitespace that might cause issues
+    cleanBase64 = cleanBase64.replace(/[\r\n\s]/g, '');
+    
+    // Convert base64 to binary
+    const binary = atob(cleanBase64);
+    
+    // Create array buffer from binary
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    
+    // Determine MIME type from the data URI or use default
+    let mime = 'image/jpeg';
+    if (base64Data.startsWith('data:')) {
+      const mimeMatch = base64Data.match(/^data:(image\/[a-z]+);base64,/);
+      if (mimeMatch && mimeMatch[1]) {
+        mime = mimeMatch[1];
+      }
+    }
+    
+    // Create and return File object
+    return new File([bytes], filename, { type: mime });
+    
+  } catch (error) {
+    console.error('Base64 conversion error:', error);
+    throw new Error(`Failed to convert base64 to file: ${error.message}`);
+  }
+}
+
 
   // Show buttons after image upload
   useEffect(() => {
@@ -836,79 +884,78 @@ function App() {
     document.addEventListener('mouseup', handleMouseUp);
   }, [updateImageBasedOnPosition]);
   
-  // Handle touch events similarly
+  // Modified touch handlers to respect minimum zoom
   const handleTouchStart = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const canvasElement = e.currentTarget;
-    isDraggingRef.current = true;
-    
-    const touch = e.touches[0];
-    
-    // Calculate normalized coordinates from canvas
-    const updateCoordinates = (clientX, clientY) => {
+    if (e.touches.length === 2) {
+      // Handle pinch zoom start
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      lastTouchDistanceRef.current = distance;
+      e.preventDefault();
+    } else if (e.touches.length === 1) {
+      // Handle single touch for dragging
+      isDraggingRef.current = true;
+      const canvasElement = e.currentTarget;
+      canvasElement.style.cursor = 'grabbing';
+      
+      const touch = e.touches[0];
+      const rect = canvasElement.getBoundingClientRect();
+      const x = (touch.clientX - rect.left) / (rect.width / 2) - 1;
+      const y = (touch.clientY - rect.top) / (rect.height / 2) - 1;
+      
+      setDragPosition({ x, y });
+      setDebugInfo({ x, y });
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (isFrozen) return;
+    if (e.touches.length === 2) {
+      // Handle pinch zoom
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+
+      if (lastTouchDistanceRef.current !== null) {
+        const delta = distance - lastTouchDistanceRef.current;
+        setZoomLevel(prev => Math.min(Math.max(prev + delta * 0.005, minZoom), 3));
+      }
+
+      lastTouchDistanceRef.current = distance;
+      e.preventDefault();
+    } else if (e.touches.length === 1 && isDraggingRef.current) {
+      // Existing single touch drag code...
+      e.preventDefault();
+      const touch = e.touches[0];
+      const canvasElement = e.currentTarget;
       const rect = canvasElement.getBoundingClientRect();
       
-      // Calculate center points
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
+      const x = (touch.clientX - rect.left) / (rect.width / 2) - 1;
+      const y = (touch.clientY - rect.top) / (rect.height / 2) - 1;
       
-      // Raw position relative to center (-1 to 1 range)
-      let rawX = (clientX - centerX) / (rect.width / 2);
-      let rawY = -1 * (clientY - centerY) / (rect.height / 2);
+      setDragPosition({ x, y });
+      setDebugInfo({ x, y });
       
-      // Calculate distance from center
-      const distance = Math.sqrt(rawX * rawX + rawY * rawY);
-      
-      // If outside circle, normalize coordinates to lie on the circle boundary
-      if (distance > 1.0) {
-        rawX = rawX / distance;
-        rawY = rawY / distance;
-      }
-      
-      return { x: rawX, y: rawY };
-    };
+      updateImageBasedOnPosition({ x, y });
+    }
+  }, [updateImageBasedOnPosition, minZoom, isFrozen]);
+
+  const handleTouchEnd = useCallback((e) => {
+    lastTouchDistanceRef.current = null;
+    isDraggingRef.current = false;
+    const canvasElement = e.currentTarget;
+    canvasElement.style.cursor = 'grab';
     
-    // Initial position
-    const initialPos = updateCoordinates(touch.clientX, touch.clientY);
-    setDragPosition(initialPos);
-    setDebugInfo(initialPos);
-    
-    // Touch move handler
-    const handleTouchMove = (moveEvent) => {
-      if (!isDraggingRef.current) return;
-      
-      moveEvent.preventDefault();
-      moveEvent.stopPropagation();
-      
-      const moveTouch = moveEvent.touches[0];
-      const newPos = updateCoordinates(moveTouch.clientX, moveTouch.clientY);
-      setDragPosition(newPos);
-      setDebugInfo(newPos);
-      
-      // Update the image based on current position during dragging for immediate feedback
-      updateImageBasedOnPosition(newPos);
-    };
-    
-    // Touch end handler
-    const handleTouchEnd = (upEvent) => {
-      upEvent.preventDefault();
-      upEvent.stopPropagation();
-      
-      isDraggingRef.current = false;
-      
-      // Final position - use last known position since touches may be empty
+    if (e.touches.length === 0) {
       updateImageBasedOnPosition(dragPosition);
-      
-      // Clean up
-      document.removeEventListener('touchmove', handleTouchMove, { passive: false });
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-    
-    // Add document-level event listeners
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd);
+    }
   }, [dragPosition, updateImageBasedOnPosition]);
 
   // const handleIconClick = (e) => {
@@ -951,6 +998,156 @@ function App() {
     setTimeout(() => setShowQRRipple(false), 600);
     handleGenerateQR();
   };
+
+  // Function to calculate minimum zoom level
+  const calculateMinZoom = useCallback(() => {
+    if (imageRef.current && containerRef.current) {
+      const container = containerRef.current.getBoundingClientRect();
+      const image = imageRef.current;
+      
+      // Calculate ratios
+      const containerRatio = container.width / container.height;
+      const imageRatio = image.naturalWidth / image.naturalHeight;
+      
+      if (containerRatio > imageRatio) {
+        // Container is wider than image ratio - fit to width
+        setMinZoom(container.width / image.width);
+      } else {
+        // Container is taller than image ratio - fit to height
+        setMinZoom(container.height / image.height);
+      }
+    }
+  }, []);
+
+  // Update minimum zoom when image or container size changes
+  useEffect(() => {
+    if (image !== DEFAULT_IMAGE) {
+      const updateMinZoom = () => {
+        calculateMinZoom();
+      };
+      
+      window.addEventListener('resize', updateMinZoom);
+      return () => window.removeEventListener('resize', updateMinZoom);
+    }
+  }, [image, calculateMinZoom]);
+
+  // Add zoom control functions with minimum zoom check
+  const handleZoomIn = (e) => {
+    if (isFrozen) return;
+    e.stopPropagation();
+    setZoomLevel(prev => Math.min(prev + 0.2, 3));
+  };
+
+  const handleZoomOut = (e) => {
+    if (isFrozen) return;
+    e.stopPropagation();
+    setZoomLevel(prev => Math.max(prev - 0.2, minZoom));
+  };
+
+  // Add clear window drag handlers
+  const handleClearWindowMouseDown = (e) => {
+    if (image === DEFAULT_IMAGE || isFrozen) return;
+    isDraggingWindowRef.current = true;
+    e.stopPropagation();
+  };
+
+  const handleClearWindowMouseMove = useCallback((e) => {
+    if (!isDraggingWindowRef.current || isFrozen) return;
+
+    const container = containerRef.current.getBoundingClientRect();
+    const clearWindow = clearWindowRef.current.getBoundingClientRect();
+    
+    // Calculate new position in percentages
+    let newX = ((e.clientX - container.left - clearWindow.width / 2) / container.width) * 100;
+    let newY = ((e.clientY - container.top - clearWindow.height / 2) / container.height) * 100;
+    
+    // Clamp values to keep window within container
+    newX = Math.max(0, Math.min(100 - (clearWindow.width / container.width) * 100, newX));
+    newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
+    
+    setClearWindowPosition({ x: newX, y: newY });
+    e.preventDefault();
+  }, [isFrozen]);
+
+  const handleClearWindowMouseUp = () => {
+    isDraggingWindowRef.current = false;
+  };
+
+  // Add event listeners for window dragging
+  useEffect(() => {
+    if (image !== DEFAULT_IMAGE) {
+      window.addEventListener('mousemove', handleClearWindowMouseMove);
+      window.addEventListener('mouseup', handleClearWindowMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleClearWindowMouseMove);
+        window.removeEventListener('mouseup', handleClearWindowMouseUp);
+      };
+    }
+  }, [image, handleClearWindowMouseMove]);
+
+  // Handle double click on clear window
+  const handleClearWindowDoubleClick = (e) => {
+    e.stopPropagation();
+    setIsFrozen(!isFrozen); // Toggle frozen state
+  };
+
+  // Extract selected section
+  const extractSelectedSection = useCallback(() => {
+    if (!clearWindowRef.current || !containerRef.current) return;
+
+    // Create a canvas to capture the clear window content
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Get the container and clear window elements
+    const container = containerRef.current.getBoundingClientRect();
+    const clearWindow = clearWindowRef.current;
+    
+    // First, create a canvas that matches the clear window size
+    canvas.width = clearWindow.offsetWidth;
+    canvas.height = clearWindow.offsetHeight;
+
+    // Find the image element inside the clear window
+    const clearImage = clearWindow.querySelector('img');
+    if (!clearImage) return;
+
+    // Calculate the visible portion coordinates
+    const scale = zoomLevel;
+    const offsetX = (clearWindowPosition.x / 100) * clearImage.width * scale;
+    const offsetY = (clearWindowPosition.y / 100) * clearImage.height * scale;
+
+    // Draw the visible portion
+    ctx.drawImage(
+      clearImage,
+      -offsetX,
+      -offsetY,
+      clearImage.width * scale,
+      clearImage.height * scale
+    );
+
+    // Create a new canvas for the final output at container size
+    const outputCanvas = document.createElement('canvas');
+    const outputCtx = outputCanvas.getContext('2d');
+    outputCanvas.width = container.width;
+    outputCanvas.height = container.height;
+
+    // Draw the captured content stretched to container size
+    outputCtx.drawImage(canvas, 0, 0, outputCanvas.width, outputCanvas.height);
+
+    // Convert to base64
+    const extractedImage = outputCanvas.toDataURL('image/jpeg', 1.0);
+
+    // Update state
+    setSelectedSection(extractedImage);
+    setImage(extractedImage);
+    
+    // Reset states
+    setShowIcon(false);
+    setShowUrlInput(false);
+    setZoomLevel(1);
+    setIsFrozen(false);
+
+  }, [clearWindowPosition, zoomLevel]);
 
   return (
     <motion.div
@@ -1115,82 +1312,203 @@ function App() {
 
               {/* Image Content */}
           <motion.div
+            ref={containerRef}
             style={{
               width: "100%",
               height: "100%",
               overflow: "hidden",
-                  borderRadius: "2px",
-                  pointerEvents: "none",
+              borderRadius: "2px",
+              pointerEvents: image !== DEFAULT_IMAGE ? "auto" : "none",
               position: "relative",
               zIndex: 1,
-                  background: "#fff",
-                  display: "flex",
-                  flexDirection: "column",
-                  backdropFilter: "none"  // Ensure no blur on the image container
-                }}
-              >
-                {loading ? (
-                  <div style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-                    background: "rgba(255, 255, 255, 0.8)",
-                    pointerEvents: "none"
-                  }}>
-                    <div style={{
-                      width: "40px",
-                      height: "40px",
-                      border: "1px solid #f3f3f3",
-                      borderTop: "1px solid #40ff00",
-                      borderRadius: "50%",
-                      animation: "spin 1s linear infinite",
-                    }} />
-                  </div>
-                ) : (
-                  <>
-                    <motion.img
-                      key={image}
-                      src={image}
-                      alt="Preview"
+              background: "#fff",
+              display: "flex",
+              flexDirection: "column",
+              backdropFilter: "none"
+            }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {loading ? (
+              <div style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(255, 255, 255, 0.8)",
+                pointerEvents: "none"
+              }}>
+                <div style={{
+                  width: "40px",
+                  height: "40px",
+                  border: "1px solid #f3f3f3",
+                  borderTop: "1px solid #40ff00",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite",
+                }} />
+              </div>
+            ) : (
+              <>
+                <motion.img
+                  ref={imageRef}
+                  key={image}
+                  src={image}
+                  alt="Preview"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
                   style={{
                     width: "100%",
                     height: "100%",
-                        objectFit: "cover",
-                        objectPosition: "center",
-                        pointerEvents: "none",
-                        animation: isProcessing ? "imageDim 4s ease-in-out infinite" : "none"
-                      }}
-                      onError={(e) => {
-                        console.error('Image loading error:', e);
-                        setImage(DEFAULT_IMAGE);
-                      }}
-                    />
-                  </>
-                )}
-                {isProcessing && (
-                  <>
-                    <div 
-                      className={`scanning-overlay${isProcessing ? ' active' : ''}`}
+                    objectFit: "cover",
+                    objectPosition: "center",
+                    pointerEvents: "none",
+                    animation: isProcessing ? "imageDim 4s ease-in-out infinite" : "none",
+                    filter: (image !== DEFAULT_IMAGE && !selectedSection) ? "blur(8px)" : "none",
+                    transform: `scale(${zoomLevel})`,
+                    transition: "transform 0.2s ease-out"
+                  }}
+                  onLoad={calculateMinZoom}
+                  onError={(e) => {
+                    console.error('Image loading error:', e);
+                    setImage(DEFAULT_IMAGE);
+                  }}
+                />
+
+                {/* Clear Window */}
+                {image !== DEFAULT_IMAGE && !selectedSection && (
+                  <div
+                    ref={clearWindowRef}
+                    style={{
+                      position: "absolute",
+                      left: `${clearWindowPosition.x}%`,
+                      top: `${clearWindowPosition.y}%`,
+                      width: "250px",
+                      height: "250px",
+                      cursor: isFrozen ? "default" : "move",
+                      pointerEvents: "auto",
+                      zIndex: 3
+                    }}
+                    onMouseDown={handleClearWindowMouseDown}
+                    onDoubleClick={handleClearWindowDoubleClick}
+                  >
+                    {/* Clear Window Border */}
+                    <div
                       style={{
                         position: "absolute",
-                        top: 0,
-                        left: "-50%",
-                        width: "200%",
+                        width: "100%",
                         height: "100%",
+                        border: `2px solid ${isFrozen ? "rgba(64, 255, 0, 0.8)" : "rgba(255, 255, 255, 0.8)"}`,
+                        borderRadius: "6px",
+                        boxShadow: isFrozen 
+                          ? "0 0 10px rgba(64, 255, 0, 0.5), 0 0 20px rgba(64, 255, 0, 0.3)" 
+                          : "0 0 10px rgba(0, 0, 0, 0.3)",
                         pointerEvents: "none",
-            zIndex: 2,
-                        willChange: "transform",
-                        mixBlendMode: "overlay"
-          }}
+                        transition: "all 0.3s ease"
+                      }}
                     />
+                    {/* Clear Window Content */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        width: "100%",
+                        height: "100%",
+                        overflow: "hidden",
+                        borderRadius: "4px"
+                      }}
+                    >
+                      <img
+                        src={image}
+                        alt="Clear Preview"
+                        style={{
+                          width: `${100 * (containerRef.current?.offsetWidth || 340) / 100}px`,
+                          height: `${100 * (containerRef.current?.offsetHeight || 340) / 100}px`,
+                          objectFit: "cover",
+                          objectPosition: "center",
+                          transform: `scale(${zoomLevel}) translate(${-clearWindowPosition.x}%, ${-clearWindowPosition.y}%)`,
+                          transformOrigin: "top left",
+                          pointerEvents: "none"
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Zoom Controls for Desktop */}
+                {!isMobile && image !== DEFAULT_IMAGE && !selectedSection && (
+                  <div style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "10px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    zIndex: 2,
+                    pointerEvents: "auto"
+                  }}>
+                    <button
+                      onClick={handleZoomIn}
+                      style={{
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "4px",
+                        border: "none",
+                        background: "rgba(255, 255, 255, 0.8)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                        fontWeight: "bold",
+                        color: "#002496"
+                      }}
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={handleZoomOut}
+                      style={{
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "4px",
+                        border: "none",
+                        background: "rgba(255, 255, 255, 0.8)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                        fontWeight: "bold",
+                        color: "#002496"
+                      }}
+                    >
+                      -
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            {isProcessing && (
+              <>
+                <div 
+                  className={`scanning-overlay${isProcessing ? ' active' : ''}`}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: "-50%",
+                    width: "200%",
+                    height: "100%",
+                    pointerEvents: "none",
+            zIndex: 2,
+                    willChange: "transform",
+                    mixBlendMode: "overlay"
+          }}
+                />
           <div
             style={{
                         position: "absolute",
@@ -1263,7 +1581,8 @@ function App() {
                         margin: "0 auto",
                         flexDirection: "row",
                         alignItems: "center",
-                        justifyContent: "center"
+                        justifyContent: "center",
+                        gap: "10px"
                       }}>
                         <motion.div
                           initial={{ x: 0, opacity: 0, scale: 0.9 }}
@@ -1338,25 +1657,29 @@ function App() {
                             {!isMobile && (
                               <motion.button
                                 initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                                animate={{ opacity: 1 }}
                                 transition={{ duration: 0.3, delay: 0.6 }}
-                  style={{
+                                style={{
                                   padding: " 16px",
-                                  background: "#40ff00",
+                                  background: isFrozen ? "#40ff00" : "#a0a0a0",
                                   border: "none",
                                   color: "white",
-                                  cursor: "pointer",
+                                  cursor: isFrozen ? "pointer" : "not-allowed",
                                   fontWeight: "500",
                                   fontSize: "13px",
                                   height: "30px",
-                    display: "flex",
-                    alignItems: "center",
+                                  display: "flex",
+                                  alignItems: "center",
                                   marginLeft: "auto",
                                   borderRadius: "1px",
                                   textDecoration: "none",
                                   width: "auto"
                                 }}
-                                onClick={handleProcessClick}
+                                onClick={(e) => {
+                                  if (!isFrozen) return;
+                                  extractSelectedSection();
+                                  handleProcessClick(e);
+                                }}
                                 type="button"
                               >
                                 Link
@@ -1365,36 +1688,84 @@ function App() {
                           </div>
                         </motion.div>
                         
-                        {isMobile && (
-                          <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                            transition={{ duration: 0.3, delay: 0.6 }}
-                  style={{
-                              padding: "16px",
-                              background: "#40ff00",
-                              border: "none",
-                              color: "white",
-                              cursor: "pointer",
-                              fontWeight: "500",
-                              fontSize: "13px",
-                              height: "30px",
-                    display: "flex",
-                    alignItems: "center",
-                              marginTop: "10px",
-                              borderRadius: "1px",
-                              textDecoration: "none",
-                              width: "auto",
+                        {/* Freeze instruction message */}
+                        {!isFrozen && image !== DEFAULT_IMAGE && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            style={{
                               position: "absolute",
+                              bottom: "-20px",
                               left: "50%",
                               transform: "translateX(-50%)",
-                              top: "calc(50% + 30px)"
+                              fontSize: "12px",
+                              color: "#4a90e2",
+                              whiteSpace: "nowrap",
+                              textAlign: "center",
+                              width: "100%"
                             }}
-                            onClick={handleProcessClick}
-                            type="button"
                           >
-                            Link
-                          </motion.button>
+                            Double-click the clear window to freeze image before linking
+                          </motion.div>
+                        )}
+
+                        {isMobile && (
+                          <>
+                            <motion.button
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.3, delay: 0.6 }}
+                              style={{
+                                padding: "16px",
+                                background: isFrozen ? "#40ff00" : "#a0a0a0",
+                                border: "none",
+                                color: "white",
+                                cursor: isFrozen ? "pointer" : "not-allowed",
+                                fontWeight: "500",
+                                fontSize: "13px",
+                                height: "30px",
+                                display: "flex",
+                                alignItems: "center",
+                                marginTop: "10px",
+                                borderRadius: "1px",
+                                textDecoration: "none",
+                                width: "auto",
+                                position: "absolute",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                top: "calc(50% + 30px)"
+                              }}
+                              onClick={(e) => {
+                                if (!isFrozen) return;
+                                extractSelectedSection();
+                                handleProcessClick(e);
+                              }}
+                              type="button"
+                            >
+                              Link
+                            </motion.button>
+                            
+                            {/* Mobile freeze instruction message */}
+                            {!isFrozen && image !== DEFAULT_IMAGE && (
+                              <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                style={{
+                                  position: "absolute",
+                                  top: "calc(50% + 65px)",
+                                  left: "50%",
+                                  transform: "translateX(-50%)",
+                                  fontSize: "12px",
+                                  color: "#4a90e2",
+                                  whiteSpace: "nowrap",
+                                  textAlign: "center",
+                                  width: "100%"
+                                }}
+                              >
+                                Double-tap clear window to freeze image
+                              </motion.div>
+                            )}
+                          </>
                         )}
         </div>
                     )}
