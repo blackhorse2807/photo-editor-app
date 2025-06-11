@@ -237,12 +237,22 @@ function App() {
       setZoomLevel(clampedZoom);
       
       // Show zoom indicator
-      showZoomLevelIndicator();
+      setShowZoomIndicator(true);
+      
+      // Clear any existing timeout
+      if (zoomIndicatorTimeoutRef.current) {
+        clearTimeout(zoomIndicatorTimeoutRef.current);
+      }
+      
+      // Set new timeout to hide indicator
+      zoomIndicatorTimeoutRef.current = setTimeout(() => {
+        setShowZoomIndicator(false);
+      }, 1500);
     }
     
     e.preventDefault();
     e.stopPropagation();
-  }, [isFrozen, minZoom, zoomLevel, showZoomLevelIndicator]);
+  }, [isFrozen, minZoom, zoomLevel]);
 
   // Update touch event handling with passive: false
   useEffect(() => {
@@ -1149,7 +1159,19 @@ function base64ToFile(base64Data, filename) {
     e.stopPropagation();
     const newZoom = Math.min(zoomLevel + 0.2, 3);
     setZoomLevel(newZoom);
-    showZoomLevelIndicator();
+    
+    // Show zoom indicator
+    setShowZoomIndicator(true);
+    
+    // Clear any existing timeout
+    if (zoomIndicatorTimeoutRef.current) {
+      clearTimeout(zoomIndicatorTimeoutRef.current);
+    }
+    
+    // Set new timeout to hide indicator
+    zoomIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowZoomIndicator(false);
+    }, 1500);
   };
 
   const handleZoomOut = (e) => {
@@ -1157,7 +1179,19 @@ function base64ToFile(base64Data, filename) {
     e.stopPropagation();
     const newZoom = Math.max(zoomLevel - 0.2, minZoom);
     setZoomLevel(newZoom);
-    showZoomLevelIndicator();
+    
+    // Show zoom indicator
+    setShowZoomIndicator(true);
+    
+    // Clear any existing timeout
+    if (zoomIndicatorTimeoutRef.current) {
+      clearTimeout(zoomIndicatorTimeoutRef.current);
+    }
+    
+    // Set new timeout to hide indicator
+    zoomIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowZoomIndicator(false);
+    }, 1500);
   };
 
   // Add clear window drag handlers
@@ -1264,21 +1298,6 @@ function base64ToFile(base64Data, filename) {
     setIsFrozen(false);
 
   }, [clearWindowPosition, zoomLevel]);
-
-  // Function to show zoom indicator and auto-hide it after some time
-  const showZoomLevelIndicator = () => {
-    setShowZoomIndicator(true);
-    
-    // Clear any existing timeout
-    if (zoomIndicatorTimeoutRef.current) {
-      clearTimeout(zoomIndicatorTimeoutRef.current);
-    }
-    
-    // Set new timeout to hide indicator
-    zoomIndicatorTimeoutRef.current = setTimeout(() => {
-      setShowZoomIndicator(false);
-    }, 1500);
-  };
 
   // Show zoom hint when image is first loaded on mobile
   useEffect(() => {
@@ -1631,7 +1650,7 @@ function base64ToFile(base64Data, filename) {
                           boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
                         }}
                       >
-                        Pinch to zoom • Drag to move
+                        {/* Pinch to zoom • Drag to move */}
                       </div>
                     )}
                   </div>
