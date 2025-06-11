@@ -1730,7 +1730,7 @@ function base64ToFile(base64Data, filename) {
                         </motion.div>
                         
                         {/* Freeze instruction message */}
-                        {!isFrozen && image !== DEFAULT_IMAGE && (
+                        {/* {!isFrozen && image !== DEFAULT_IMAGE && (
                           <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1748,7 +1748,7 @@ function base64ToFile(base64Data, filename) {
                           >
                             Double-click the clear window to freeze image before linking
                           </motion.div>
-                        )}
+                        )} */}
 
                         {isMobile && (
                           <>
@@ -1787,7 +1787,7 @@ function base64ToFile(base64Data, filename) {
                             </motion.button>
                             
                             {/* Mobile freeze instruction message */}
-                            {!isFrozen && image !== DEFAULT_IMAGE && (
+                            {/* {!isFrozen && image !== DEFAULT_IMAGE && (
                               <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1805,7 +1805,7 @@ function base64ToFile(base64Data, filename) {
                               >
                                 Double-tap clear window to freeze image
                               </motion.div>
-                            )}
+                            )} */}
                           </>
                         )}
         </div>
