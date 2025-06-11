@@ -154,6 +154,43 @@ function App() {
   // Add new state for icon animations
   const [showSideIcons, setShowSideIcons] = useState(false);
 
+  // For tracking drag state
+const clearWindowTouchDragRef = useRef(false);
+const clearWindowLastTouchRef = useRef({ x: 0, y: 0 });
+
+const handleClearWindowTouchStart = (e) => {
+  if (image === DEFAULT_IMAGE || isFrozen) return;
+  clearWindowTouchDragRef.current = true;
+  const touch = e.touches[0];
+  clearWindowLastTouchRef.current = { x: touch.clientX, y: touch.clientY };
+  e.stopPropagation();
+};
+
+const handleClearWindowTouchMove = (e) => {
+  if (!clearWindowTouchDragRef.current || isFrozen) return;
+  const touch = e.touches[0];
+  const container = containerRef.current.getBoundingClientRect();
+  const clearWindow = clearWindowRef.current.getBoundingClientRect();
+
+  // Calculate new position in percentages
+  let newX = ((touch.clientX - container.left - clearWindow.width / 2) / container.width) * 100;
+  let newY = ((touch.clientY - container.top - clearWindow.height / 2) / container.height) * 100;
+
+  // Clamp values to keep window within container
+  newX = Math.max(0, Math.min(100 - (clearWindow.width / container.width) * 100, newX));
+  newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
+
+  setClearWindowPosition({ x: newX, y: newY });
+
+  e.preventDefault();
+  e.stopPropagation();
+};
+
+const handleClearWindowTouchEnd = (e) => {
+  clearWindowTouchDragRef.current = false;
+  e.stopPropagation();
+};
+
   // Disable image click when certain interactions are happening
   useEffect(() => {
     // Disable image clicking when showing dialup, 3D model, or processing
@@ -416,7 +453,7 @@ function App() {
     input.click();
   };
   
-  const boxSize = isMobile ? 270 : 340;
+  const boxSize = isMobile ? 320 : 340;
   // const borderColor = "#8fd6f9";
 
   const whiteCyan = "linear-gradient(to bottom, #2D87C7 0%, #ffffff 100%)";
@@ -1388,14 +1425,18 @@ function base64ToFile(base64Data, filename) {
                       position: "absolute",
                       left: `${clearWindowPosition.x}%`,
                       top: `${clearWindowPosition.y}%`,
-                      width: "250px",
-                      height: "250px",
+                      width: isMobile ? "150px" : "250px",
+                      height: isMobile ? "150px" : "250px",
                       cursor: isFrozen ? "default" : "move",
                       pointerEvents: "auto",
-                      zIndex: 3
+                      zIndex: 3,
+                      touchAction: "none"
                     }}
                     onMouseDown={handleClearWindowMouseDown}
                     onDoubleClick={handleClearWindowDoubleClick}
+                    onTouchStart={handleClearWindowTouchStart}
+                    onTouchMove={handleClearWindowTouchMove}
+                    onTouchEnd={handleClearWindowTouchEnd}
                   >
                     {/* Clear Window Border */}
                     <div
