@@ -2098,7 +2098,7 @@ function base64ToFile(base64Data, filename) {
                       position: "absolute",
                       width: isMobile ? boxSize*0.8 : boxSize * 0.6,
                       height: isMobile ? boxSize*0.8 : boxSize * 0.6,
-                      top: isMobile ? "300px" : "360px",
+                      top: isMobile ? "320px" : "360px",
                       left: isMobile ? "20px" : "60px",
                       transform: "translate(-50%, -50%)",
                       zIndex: 100,

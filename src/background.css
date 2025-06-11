@@ -23,3 +23,7 @@
     background-position: 0% 30%;
   }
 } 
+body, #root {
+  touch-action: none !important;
+  overscroll-behavior: contain;
+}
