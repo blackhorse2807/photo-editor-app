@@ -23,7 +23,7 @@
     background-position: 0% 30%;
   }
 } 
-body, #root {
+/* body, #root {
   touch-action: none !important;
   overscroll-behavior: contain;
-}
+} */
