@@ -155,41 +155,114 @@ function App() {
   const [showSideIcons, setShowSideIcons] = useState(false);
 
   // For tracking drag state
-const clearWindowTouchDragRef = useRef(false);
-const clearWindowLastTouchRef = useRef({ x: 0, y: 0 });
+  const clearWindowTouchDragRef = useRef(false);
+  const clearWindowLastTouchRef = useRef({ x: 0, y: 0 });
+  
+  // For tracking pinch-to-zoom on clear window
+  const clearWindowPinchRef = useRef(false);
+  const clearWindowInitialPinchDistanceRef = useRef(0);
+  const clearWindowInitialZoomRef = useRef(1);
 
-const handleClearWindowTouchStart = (e) => {
-  if (image === DEFAULT_IMAGE || isFrozen) return;
-  clearWindowTouchDragRef.current = true;
-  const touch = e.touches[0];
-  clearWindowLastTouchRef.current = { x: touch.clientX, y: touch.clientY };
-  e.stopPropagation();
-};
+  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
+  const zoomIndicatorTimeoutRef = useRef(null);
 
-const handleClearWindowTouchMove = (e) => {
-  if (!clearWindowTouchDragRef.current || isFrozen) return;
-  const touch = e.touches[0];
-  const container = containerRef.current.getBoundingClientRect();
-  const clearWindow = clearWindowRef.current.getBoundingClientRect();
+  const [showZoomHint, setShowZoomHint] = useState(false);
+  const zoomHintTimeoutRef = useRef(null);
 
-  // Calculate new position in percentages
-  let newX = ((touch.clientX - container.left - clearWindow.width / 2) / container.width) * 100;
-  let newY = ((touch.clientY - container.top - clearWindow.height / 2) / container.height) * 100;
+  const handleClearWindowTouchStart = (e) => {
+    if (image === DEFAULT_IMAGE || isFrozen) return;
+    
+    if (e.touches.length === 1) {
+      // Single touch for dragging
+      clearWindowTouchDragRef.current = true;
+      clearWindowPinchRef.current = false;
+      const touch = e.touches[0];
+      clearWindowLastTouchRef.current = { x: touch.clientX, y: touch.clientY };
+    } else if (e.touches.length === 2) {
+      // Two touches for pinch-to-zoom
+      clearWindowTouchDragRef.current = false;
+      clearWindowPinchRef.current = true;
+      
+      // Calculate initial distance between two fingers
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      
+      clearWindowInitialPinchDistanceRef.current = distance;
+      clearWindowInitialZoomRef.current = zoomLevel;
+    }
+    
+    e.stopPropagation();
+    e.preventDefault(); // Add preventDefault to avoid other touch events
+  };
 
-  // Clamp values to keep window within container
-  newX = Math.max(0, Math.min(100 - (clearWindow.width / container.width) * 100, newX));
-  newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
+  const handleClearWindowTouchMove = useCallback((e) => {
+    if (isFrozen) return;
+    
+    if (clearWindowTouchDragRef.current && e.touches.length === 1) {
+      // Handle dragging
+      const touch = e.touches[0];
+      const container = containerRef.current.getBoundingClientRect();
+      const clearWindow = clearWindowRef.current.getBoundingClientRect();
+    
+      // Calculate new position in percentages
+      let newX = ((touch.clientX - container.left - clearWindow.width / 2) / container.width) * 100;
+      let newY = ((touch.clientY - container.top - clearWindow.height / 2) / container.height) * 100;
+    
+      // Clamp values to keep window within container
+      newX = Math.max(0, Math.min(100 - (clearWindow.width / container.width) * 100, newX));
+      newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
+    
+      setClearWindowPosition({ x: newX, y: newY });
+    } else if (clearWindowPinchRef.current && e.touches.length === 2) {
+      // Handle pinch-to-zoom
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      
+      // Calculate current distance
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      
+      // Calculate zoom scale factor based on the change in distance
+      const scaleFactor = currentDistance / clearWindowInitialPinchDistanceRef.current;
+      
+      // Apply zoom with limits - make zooming smoother with a smaller increment
+      const newZoom = clearWindowInitialZoomRef.current * scaleFactor;
+      const clampedZoom = Math.min(Math.max(newZoom, minZoom), 3);
+      setZoomLevel(clampedZoom);
+      
+      // Show zoom indicator
+      showZoomLevelIndicator();
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+  }, [isFrozen, minZoom, zoomLevel, showZoomLevelIndicator]);
 
-  setClearWindowPosition({ x: newX, y: newY });
+  // Update touch event handling with passive: false
+  useEffect(() => {
+    const clearWindowElement = clearWindowRef.current;
+    
+    if (clearWindowElement && image !== DEFAULT_IMAGE) {
+      // Add touch event listeners with passive: false to allow preventDefault
+      clearWindowElement.addEventListener('touchmove', handleClearWindowTouchMove, { passive: false });
+      
+      return () => {
+        clearWindowElement.removeEventListener('touchmove', handleClearWindowTouchMove);
+      };
+    }
+  }, [image, handleClearWindowTouchMove]);
 
-  e.preventDefault();
-  e.stopPropagation();
-};
-
-const handleClearWindowTouchEnd = (e) => {
-  clearWindowTouchDragRef.current = false;
-  e.stopPropagation();
-};
+  const handleClearWindowTouchEnd = (e) => {
+    clearWindowTouchDragRef.current = false;
+    clearWindowPinchRef.current = false;
+    e.stopPropagation();
+  };
 
   // Disable image click when certain interactions are happening
   useEffect(() => {
@@ -453,7 +526,9 @@ const handleClearWindowTouchEnd = (e) => {
     input.click();
   };
   
-  const boxSize = isMobile ? 320 : 340;
+  const boxSize = isMobile ? 280 : 340;
+  const boxWidth = isMobile ? 270 : 340; // Keep width the same
+  const boxHeight = isMobile ? 300 : 340; // Increase height on mobile
   // const borderColor = "#8fd6f9";
 
   const whiteCyan = "linear-gradient(to bottom, #2D87C7 0%, #ffffff 100%)";
@@ -1072,13 +1147,17 @@ function base64ToFile(base64Data, filename) {
   const handleZoomIn = (e) => {
     if (isFrozen) return;
     e.stopPropagation();
-    setZoomLevel(prev => Math.min(prev + 0.2, 3));
+    const newZoom = Math.min(zoomLevel + 0.2, 3);
+    setZoomLevel(newZoom);
+    showZoomLevelIndicator();
   };
 
   const handleZoomOut = (e) => {
     if (isFrozen) return;
     e.stopPropagation();
-    setZoomLevel(prev => Math.max(prev - 0.2, minZoom));
+    const newZoom = Math.max(zoomLevel - 0.2, minZoom);
+    setZoomLevel(newZoom);
+    showZoomLevelIndicator();
   };
 
   // Add clear window drag handlers
@@ -1185,6 +1264,39 @@ function base64ToFile(base64Data, filename) {
     setIsFrozen(false);
 
   }, [clearWindowPosition, zoomLevel]);
+
+  // Function to show zoom indicator and auto-hide it after some time
+  const showZoomLevelIndicator = () => {
+    setShowZoomIndicator(true);
+    
+    // Clear any existing timeout
+    if (zoomIndicatorTimeoutRef.current) {
+      clearTimeout(zoomIndicatorTimeoutRef.current);
+    }
+    
+    // Set new timeout to hide indicator
+    zoomIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowZoomIndicator(false);
+    }, 1500);
+  };
+
+  // Show zoom hint when image is first loaded on mobile
+  useEffect(() => {
+    if (isMobile && image !== DEFAULT_IMAGE && !selectedSection) {
+      setShowZoomHint(true);
+      
+      // Auto-hide hint after 4 seconds
+      zoomHintTimeoutRef.current = setTimeout(() => {
+        setShowZoomHint(false);
+      }, 4000);
+      
+      return () => {
+        if (zoomHintTimeoutRef.current) {
+          clearTimeout(zoomHintTimeoutRef.current);
+        }
+      };
+    }
+  }, [isMobile, image, selectedSection]);
 
   return (
     <motion.div
@@ -1309,8 +1421,8 @@ function base64ToFile(base64Data, filename) {
               transition={{ duration: 0.5, ease: "easeOut" }}
             style={{
             position: "relative",
-            width: boxSize,
-            height: boxSize,
+            width: boxWidth,
+            height: boxHeight,
             top: isMobile ? "10px" : "-70px",
             borderRadius: "4px",
             border: `3px solid ${image === DEFAULT_IMAGE ? "#6EC2FF" : "#45FF02"}`,
@@ -1453,6 +1565,28 @@ function base64ToFile(base64Data, filename) {
                         transition: "all 0.3s ease"
                       }}
                     />
+                    
+                    {/* Zoom level indicator */}
+                    {showZoomIndicator && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          right: "10px",
+                          background: "rgba(0, 0, 0, 0.6)",
+                          color: "white",
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          zIndex: 10,
+                          pointerEvents: "none"
+                        }}
+                      >
+                        {Math.round(zoomLevel * 100)}%
+                      </div>
+                    )}
+
                     {/* Clear Window Content */}
                     <div
                       style={{
@@ -1477,6 +1611,29 @@ function base64ToFile(base64Data, filename) {
                         }}
                       />
                     </div>
+                    
+                    {/* Pinch-to-zoom hint for mobile */}
+                    {isMobile && showZoomHint && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          bottom: "-35px",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          background: "rgba(0, 0, 0, 0.7)",
+                          color: "white",
+                          padding: "5px 10px",
+                          borderRadius: "15px",
+                          fontSize: "11px",
+                          whiteSpace: "nowrap",
+                          zIndex: 10,
+                          pointerEvents: "none",
+                          boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
+                        }}
+                      >
+                        Pinch to zoom • Drag to move
+                      </div>
+                    )}
                   </div>
                 )}
 
