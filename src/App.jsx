@@ -1047,7 +1047,7 @@ function base64ToFile(base64Data, filename) {
 
       if (lastTouchDistanceRef.current !== null) {
         const delta = distance - lastTouchDistanceRef.current;
-        setZoomLevel(prev => Math.min(Math.max(prev + delta * 0.005, minZoom), 3));
+        setZoomLevel(prev => Math.min(Math.max(prev + delta * 0.05, minZoom), 8));
       }
 
       lastTouchDistanceRef.current = distance;
