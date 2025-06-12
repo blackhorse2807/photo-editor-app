@@ -142,9 +142,12 @@ function App() {
   const [minZoom, setMinZoom] = useState(1);
   const boxSize = isMobile ? 280 : DEFAULT_BOX_SIZE;
   const boxWidth = isMobile ? 270 : DEFAULT_BOX_SIZE; 
+  const [boxHeight, setBoxHeight] = useState(isMobile ? 280 : DEFAULT_BOX_SIZE); // Will adjust based on image proportion
 
-  const [clearWindowPosition, setClearWindowPosition] = useState({ x: 67/2, y: 67/2 });
+  const [clearWindowPosition, setClearWindowPosition] = useState({ x: 33.5, y: 33.5 }); // Center the window at 1/3rd position
   const [clearWindowSize, setClearWindowSize] = useState({
+    width: boxWidth / 3,
+    height: boxHeight / 3
   });
   const [isFrozen, setIsFrozen] = useState(false);
   const [selectedSection, setSelectedSection] = useState(null);
@@ -152,7 +155,6 @@ function App() {
   const [resizeDirection, setResizeDirection] = useState(null);
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const isDraggingRef = useRef(false);
-  const processingCompleteRef = useRef(false);
   const lastTouchDistanceRef = useRef(null);
   const imageRef = useRef(null);
   const containerRef = useRef(null);
@@ -176,6 +178,14 @@ function App() {
 
   const [showZoomHint, setShowZoomHint] = useState(false);
   const zoomHintTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    // Update clear window size when box dimensions change
+    setClearWindowSize({
+      width: boxWidth / 3,
+      height: boxHeight / 3
+    });
+  }, [boxWidth, boxHeight]);
 
   const handleClearWindowTouchStart = (e) => {
     if (image === DEFAULT_IMAGE || isFrozen) return;
@@ -297,7 +307,10 @@ function App() {
       newHeight = Math.min(newHeight, maxHeight);
       
       // Update states
-      setClearWindowSize({ width: container.width * 0.33  , height: container.height * 0.33 });
+      setClearWindowSize({ 
+        width: container.width / 3,
+        height: container.height / 3
+      });
       setClearWindowPosition({ x: newX, y: newY });
     } else if (clearWindowTouchDragRef.current && e.touches.length === 1) {
       // Handle dragging
@@ -531,12 +544,13 @@ function App() {
     // Set clear window size to 1/3 of the container size
     if (containerRef.current) {
       const container = containerRef.current.getBoundingClientRect();
+      // Set initial size to 1/3rd but allow resizing
       setClearWindowSize({
         width: container.width / 3,
         height: container.height / 3
       });
       // Position the window in the center of the container
-      setClearWindowPosition({ x: 33.33, y: 33.33 }); // Center position (100 - 33.33)/2 = 33.33%
+      setClearWindowPosition({ x: 67/2, y: 67/2 }); // Center position
     }
       
       const timer = setTimeout(() => {
@@ -659,10 +673,6 @@ function App() {
     input.click();
   };
   
- // Fixed width for desktop
-  const [boxHeight, setBoxHeight] = useState(isMobile ? 280 : DEFAULT_BOX_SIZE); // Will adjust based on image proportion
-  // const borderColor = "#8fd6f9";
-
   const whiteCyan = "linear-gradient(to bottom, #2D87C7 0%, #ffffff 100%)";
   const blueCyan = "linear-gradient(to bottom, #2D87C7 0%, #002496 100%)";
 
@@ -1415,13 +1425,27 @@ function base64ToFile(base64Data, filename) {
       newX = Math.max(0, Math.min(100 - widthPercent, newX));
       newY = Math.max(0, Math.min(100 - heightPercent, newY));
       
-      // Always maintain exactly 1/3rd of the main box dimensions
-      newWidth = containerWidth / 3;
-      newHeight = containerHeight / 3;
+      // Set maximum size constraints
+      const maxWidth = containerWidth;
+      const maxHeight = Math.min(containerHeight, 400); // Cap height at 400px
+      
+      // If not actively resizing, maintain 1/3rd ratio
+      if (!isResizing && !isDraggingWindowRef.current) {
+        newWidth = containerWidth / 3;
+        newHeight = containerHeight / 3;
+      }
+      
+      // Enforce minimum size (1/6th) and maximum size
+      const minSize = Math.min(containerWidth, containerHeight) / 6;
+      newWidth = Math.min(Math.max(newWidth, minSize), maxWidth);
+      newHeight = Math.min(Math.max(newHeight, minSize), maxHeight);
       
       // Update states
-      setClearWindowSize({ width: newWidth, height: newHeight });
-      setClearWindowPosition({ x: newX, y: newY });
+      setClearWindowSize({ 
+        width: container.width / 3,
+        height: container.height / 3
+      });
+      setClearWindowPosition({ x: 33.5, y: 33.5 });
       
     } else if (isDraggingWindowRef.current) {
     const container = containerRef.current.getBoundingClientRect();
@@ -1475,16 +1499,15 @@ function base64ToFile(base64Data, filename) {
           }
         }
         
-                  // Update clear window size to be 1/3 of the container
+                  // Update clear window size to be 1/3 of the box dimensions
           if (containerRef.current && image !== DEFAULT_IMAGE) {
-            const container = containerRef.current.getBoundingClientRect();
+            // Update clear window size to be 1/3 of the box dimensions
             setClearWindowSize({
-              width: container.width / 3,
-              height: container.height / 3
+              width: boxWidth / 3,
+              height: boxHeight / 3
             });
-            // Center the window: (100 - 33.33)/2 = 33.33
-            setClearWindowPosition({ x: 33.33, y: 33.33 });
-        }
+            setClearWindowPosition({ x: 33.5, y: 33.5 }); // Center at 1/3rd position
+          }
       };
       
       window.addEventListener('resize', handleResize);
