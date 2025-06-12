@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DialUpContainer from './components/DialUpContainer';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, PerspectiveCamera, OrbitControls } from '@react-three/drei';
 
 const DEFAULT_IMAGE = "/face.png";
+const DEFAULT_BOX_SIZE = 359; // Default size for both width and height before image selection
 
 // Styles for animations
 const animationStyles = `
@@ -139,9 +140,17 @@ function App() {
   const [userUrl, setUserUrl] = useState("");
   const [zoomLevel, setZoomLevel] = useState(1);
   const [minZoom, setMinZoom] = useState(1);
-  const [clearWindowPosition, setClearWindowPosition] = useState({ x: 50, y: 50 });
+  const boxSize = isMobile ? 280 : DEFAULT_BOX_SIZE;
+  const boxWidth = isMobile ? 270 : DEFAULT_BOX_SIZE; 
+
+  const [clearWindowPosition, setClearWindowPosition] = useState({ x: 67/2, y: 67/2 });
+  const [clearWindowSize, setClearWindowSize] = useState({
+  });
   const [isFrozen, setIsFrozen] = useState(false);
   const [selectedSection, setSelectedSection] = useState(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState(null);
+  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const isDraggingRef = useRef(false);
   const processingCompleteRef = useRef(false);
   const lastTouchDistanceRef = useRef(null);
@@ -151,8 +160,7 @@ function App() {
   const isDraggingWindowRef = useRef(false);
   const API_BASE_URL = 'https://tools.qrplus.ai';
 
-  // Add new state for icon animations
-  const [showSideIcons, setShowSideIcons] = useState(false);
+
 
   // For tracking drag state
   const clearWindowTouchDragRef = useRef(false);
@@ -172,7 +180,25 @@ function App() {
   const handleClearWindowTouchStart = (e) => {
     if (image === DEFAULT_IMAGE || isFrozen) return;
     
-    if (e.touches.length === 1) {
+    // Check if touching a resize handle
+    if (e.touches.length === 1 && e.target.className && e.target.className.includes('resize-handle')) {
+      const touch = e.touches[0];
+      setIsResizing(true);
+      setResizeDirection(e.target.dataset.direction);
+      
+      const container = containerRef.current.getBoundingClientRect();
+      
+      resizeStartRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        width: clearWindowSize.width,
+        height: clearWindowSize.height,
+        windowX: clearWindowPosition.x,
+        windowY: clearWindowPosition.y,
+        containerWidth: container.width,
+        containerHeight: container.height
+      };
+    } else if (e.touches.length === 1) {
       // Single touch for dragging
       clearWindowTouchDragRef.current = true;
       clearWindowPinchRef.current = false;
@@ -202,7 +228,78 @@ function App() {
   const handleClearWindowTouchMove = useCallback((e) => {
     if (isFrozen) return;
     
-    if (clearWindowTouchDragRef.current && e.touches.length === 1) {
+    if (isResizing && e.touches.length === 1) {
+      // Handle resizing
+      const touch = e.touches[0];
+      const container = containerRef.current.getBoundingClientRect();
+      const { x: startX, y: startY, width: startWidth, height: startHeight, 
+              windowX, windowY, containerWidth, containerHeight } = resizeStartRef.current;
+      
+      // Calculate delta movement
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+      
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+      let newX = windowX;
+      let newY = windowY;
+      
+      // Handle different resize directions
+      switch (resizeDirection) {
+        case 'e': // East - right edge
+          newWidth = Math.max(50, startWidth + deltaX);
+          break;
+        case 's': // South - bottom edge
+          newHeight = Math.max(50, startHeight + deltaY);
+          break;
+        case 'w': // West - left edge
+          newWidth = Math.max(50, startWidth - deltaX);
+          newX = windowX + (deltaX * startWidth / containerWidth);
+          break;
+        case 'n': // North - top edge
+          newHeight = Math.max(50, startHeight - deltaY);
+          newY = windowY + (deltaY * startHeight / containerHeight);
+          break;
+        case 'se': // Southeast - bottom-right corner
+          newWidth = Math.max(50, startWidth + deltaX);
+          newHeight = Math.max(50, startHeight + deltaY);
+          break;
+        case 'sw': // Southwest - bottom-left corner
+          newWidth = Math.max(50, startWidth - deltaX);
+          newHeight = Math.max(50, startHeight + deltaY);
+          newX = windowX + (deltaX * startWidth / containerWidth);
+          break;
+        case 'ne': // Northeast - top-right corner
+          newWidth = Math.max(50, startWidth + deltaX);
+          newHeight = Math.max(50, startHeight - deltaY);
+          newY = windowY + (deltaY * startHeight / containerHeight);
+          break;
+        case 'nw': // Northwest - top-left corner
+          newWidth = Math.max(50, startWidth - deltaX);
+          newHeight = Math.max(50, startHeight - deltaY);
+          newX = windowX + (deltaX * startWidth / containerWidth);
+          newY = windowY + (deltaY * startHeight / containerHeight);
+          break;
+      }
+      
+      // Ensure the window stays within container bounds
+      const widthPercent = (newWidth / containerWidth) * 100;
+      const heightPercent = (newHeight / containerHeight) * 100;
+      
+      // Clamp position values
+      newX = Math.max(0, Math.min(66.67, newX)); // 100 - 33.33 = 66.67
+      newY = Math.max(0, Math.min(66.67, newY));
+      
+      // Enforce maximum size (80% of container)
+      const maxWidth = boxSize;
+      const maxHeight = boxSize;
+      newWidth = Math.min(newWidth, maxWidth);
+      newHeight = Math.min(newHeight, maxHeight);
+      
+      // Update states
+      setClearWindowSize({ width: container.width * 0.33  , height: container.height * 0.33 });
+      setClearWindowPosition({ x: newX, y: newY });
+    } else if (clearWindowTouchDragRef.current && e.touches.length === 1) {
       // Handle dragging
       const touch = e.touches[0];
       const container = containerRef.current.getBoundingClientRect();
@@ -252,7 +349,7 @@ function App() {
     
     e.preventDefault();
     e.stopPropagation();
-  }, [isFrozen, minZoom, zoomLevel]);
+  }, [isFrozen, minZoom, zoomLevel, isResizing, resizeDirection]);
 
   // Update touch event handling with passive: false
   useEffect(() => {
@@ -271,6 +368,8 @@ function App() {
   const handleClearWindowTouchEnd = (e) => {
     clearWindowTouchDragRef.current = false;
     clearWindowPinchRef.current = false;
+    setIsResizing(false);
+    setResizeDirection(null);
     e.stopPropagation();
   };
 
@@ -429,6 +528,17 @@ function App() {
   // Show icon after image loads
   useEffect(() => {
     if (image !== DEFAULT_IMAGE && !loading && !show3DModel) {
+    // Set clear window size to 1/3 of the container size
+    if (containerRef.current) {
+      const container = containerRef.current.getBoundingClientRect();
+      setClearWindowSize({
+        width: container.width / 3,
+        height: container.height / 3
+      });
+      // Position the window in the center of the container
+      setClearWindowPosition({ x: 33.33, y: 33.33 }); // Center position (100 - 33.33)/2 = 33.33%
+    }
+      
       const timer = setTimeout(() => {
         setShowIcon(true);
         setShowDialUp(false); // Ensure DialUp is hidden when image is first loaded
@@ -521,6 +631,19 @@ function App() {
           reader.onload = (e) => {
             const imageUrl = e.target.result;
             setImage(imageUrl);
+            
+            // Adjust box height to preserve image proportions
+            const img = new Image();
+            img.onload = () => {
+              const imageRatio = img.width / img.height;
+              if (!isMobile) {
+                // For desktop, adjust height based on fixed width but cap at 400px
+                const calculatedHeight = boxWidth / imageRatio;
+                setBoxHeight(Math.min(calculatedHeight, 400));
+              }
+            };
+            img.src = imageUrl;
+            
             setShowRipple(true);
             setShowDialUp(false);
             setTimeout(() => setShowRipple(false), 1000);
@@ -536,9 +659,8 @@ function App() {
     input.click();
   };
   
-  const boxSize = isMobile ? 280 : 340;
-  const boxWidth = isMobile ? 270 : 340; // Keep width the same
-  const boxHeight = isMobile ? 300 : 340; // Increase height on mobile
+ // Fixed width for desktop
+  const [boxHeight, setBoxHeight] = useState(isMobile ? 280 : DEFAULT_BOX_SIZE); // Will adjust based on image proportion
   // const borderColor = "#8fd6f9";
 
   const whiteCyan = "linear-gradient(to bottom, #2D87C7 0%, #ffffff 100%)";
@@ -1131,6 +1253,12 @@ function base64ToFile(base64Data, filename) {
       const containerRatio = container.width / container.height;
       const imageRatio = image.naturalWidth / image.naturalHeight;
       
+      // Adjust box height to preserve image proportions when image is loaded
+      if (image.src !== DEFAULT_IMAGE && !isMobile) {
+        const calculatedHeight = boxWidth / imageRatio;
+        setBoxHeight(Math.min(calculatedHeight, 400));
+      }
+      
       if (containerRatio > imageRatio) {
         // Container is wider than image ratio - fit to width
         setMinZoom(container.width / image.width);
@@ -1139,7 +1267,7 @@ function base64ToFile(base64Data, filename) {
         setMinZoom(container.height / image.height);
       }
     }
-  }, []);
+  }, [boxWidth, isMobile]);
 
   // Update minimum zoom when image or container size changes
   useEffect(() => {
@@ -1197,13 +1325,105 @@ function base64ToFile(base64Data, filename) {
   // Add clear window drag handlers
   const handleClearWindowMouseDown = (e) => {
     if (image === DEFAULT_IMAGE || isFrozen) return;
+    
+    // If it's a resize handle, handle resizing
+    if (e.target.className && e.target.className.includes('resize-handle')) {
+      setIsResizing(true);
+      setResizeDirection(e.target.dataset.direction);
+      
+      const container = containerRef.current.getBoundingClientRect();
+      const clearWindow = clearWindowRef.current.getBoundingClientRect();
+      
+      resizeStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        width: clearWindowSize.width,
+        height: clearWindowSize.height,
+        windowX: clearWindowPosition.x,
+        windowY: clearWindowPosition.y,
+        containerWidth: container.width,
+        containerHeight: container.height
+      };
+    } else {
+      // Otherwise, handle dragging
     isDraggingWindowRef.current = true;
+    }
+    
     e.stopPropagation();
   };
 
   const handleClearWindowMouseMove = useCallback((e) => {
-    if (!isDraggingWindowRef.current || isFrozen) return;
-
+    if (isFrozen) return;
+    
+    if (isResizing) {
+      const container = containerRef.current.getBoundingClientRect();
+      const { x: startX, y: startY, width: startWidth, height: startHeight, 
+              windowX, windowY, containerWidth, containerHeight } = resizeStartRef.current;
+      
+      // Calculate delta movement
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+      let newX = windowX;
+      let newY = windowY;
+      
+      // Handle different resize directions
+      switch (resizeDirection) {
+        case 'e': // East - right edge
+          newWidth = Math.max(50, startWidth + deltaX);
+          break;
+        case 's': // South - bottom edge
+          newHeight = Math.max(50, startHeight + deltaY);
+          break;
+        case 'w': // West - left edge
+          newWidth = Math.max(50, startWidth - deltaX);
+          newX = windowX + (deltaX * startWidth / containerWidth);
+          break;
+        case 'n': // North - top edge
+          newHeight = Math.max(50, startHeight - deltaY);
+          newY = windowY + (deltaY * startHeight / containerHeight);
+          break;
+        case 'se': // Southeast - bottom-right corner
+          newWidth = Math.max(50, startWidth + deltaX);
+          newHeight = Math.max(50, startHeight + deltaY);
+          break;
+        case 'sw': // Southwest - bottom-left corner
+          newWidth = Math.max(50, startWidth - deltaX);
+          newHeight = Math.max(50, startHeight + deltaY);
+          newX = windowX + (deltaX * startWidth / containerWidth);
+          break;
+        case 'ne': // Northeast - top-right corner
+          newWidth = Math.max(50, startWidth + deltaX);
+          newHeight = Math.max(50, startHeight - deltaY);
+          newY = windowY + (deltaY * startHeight / containerHeight);
+          break;
+        case 'nw': // Northwest - top-left corner
+          newWidth = Math.max(50, startWidth - deltaX);
+          newHeight = Math.max(50, startHeight - deltaY);
+          newX = windowX + (deltaX * startWidth / containerWidth);
+          newY = windowY + (deltaY * startHeight / containerHeight);
+          break;
+      }
+      
+      // Ensure the window stays within container bounds
+      const widthPercent = (newWidth / containerWidth) * 100;
+      const heightPercent = (newHeight / containerHeight) * 100;
+      
+      // Clamp position values
+      newX = Math.max(0, Math.min(100 - widthPercent, newX));
+      newY = Math.max(0, Math.min(100 - heightPercent, newY));
+      
+      // Always maintain exactly 1/3rd of the main box dimensions
+      newWidth = containerWidth / 3;
+      newHeight = containerHeight / 3;
+      
+      // Update states
+      setClearWindowSize({ width: newWidth, height: newHeight });
+      setClearWindowPosition({ x: newX, y: newY });
+      
+    } else if (isDraggingWindowRef.current) {
     const container = containerRef.current.getBoundingClientRect();
     const clearWindow = clearWindowRef.current.getBoundingClientRect();
     
@@ -1216,24 +1436,66 @@ function base64ToFile(base64Data, filename) {
     newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
     
     setClearWindowPosition({ x: newX, y: newY });
+    }
+    
     e.preventDefault();
-  }, [isFrozen]);
+  }, [isFrozen, isResizing, resizeDirection]);
 
   const handleClearWindowMouseUp = () => {
     isDraggingWindowRef.current = false;
+    setIsResizing(false);
+    setResizeDirection(null);
   };
 
-  // Add event listeners for window dragging
+  // Add event listeners for window dragging and resizing
   useEffect(() => {
     if (image !== DEFAULT_IMAGE) {
       window.addEventListener('mousemove', handleClearWindowMouseMove);
       window.addEventListener('mouseup', handleClearWindowMouseUp);
+      
+      // Update window size if screen size changes
+      const handleResize = () => {
+        const newIsMobile = window.innerWidth <= 768;
+        
+        // Adjust main box size based on screen size
+        if (newIsMobile !== isMobile) {
+          // Update size state variables
+          if (newIsMobile) {
+            // Switching to mobile view
+            setBoxHeight(300);
+          } else {
+            // Switching to desktop view
+            if (imageRef.current) {
+              const imageRatio = imageRef.current.naturalWidth / imageRef.current.naturalHeight;
+              const calculatedHeight = boxWidth / imageRatio;
+              setBoxHeight(Math.min(calculatedHeight, 400));
+            } else {
+              setBoxHeight(359);
+            }
+          }
+        }
+        
+                  // Update clear window size to be 1/3 of the container
+          if (containerRef.current && image !== DEFAULT_IMAGE) {
+            const container = containerRef.current.getBoundingClientRect();
+            setClearWindowSize({
+              width: container.width / 3,
+              height: container.height / 3
+            });
+            // Center the window: (100 - 33.33)/2 = 33.33
+            setClearWindowPosition({ x: 33.33, y: 33.33 });
+        }
+      };
+      
+      window.addEventListener('resize', handleResize);
+      
       return () => {
         window.removeEventListener('mousemove', handleClearWindowMouseMove);
         window.removeEventListener('mouseup', handleClearWindowMouseUp);
+        window.removeEventListener('resize', handleResize);
       };
     }
-  }, [image, handleClearWindowMouseMove]);
+  }, [image, handleClearWindowMouseMove, isMobile]);
 
   // Handle double click on clear window
   const handleClearWindowDoubleClick = (e) => {
@@ -1254,8 +1516,8 @@ function base64ToFile(base64Data, filename) {
     const clearWindow = clearWindowRef.current;
     
     // First, create a canvas that matches the clear window size
-    canvas.width = clearWindow.offsetWidth;
-    canvas.height = clearWindow.offsetHeight;
+    canvas.width = clearWindowSize.width;
+    canvas.height = clearWindowSize.height;
 
     // Find the image element inside the clear window
     const clearImage = clearWindow.querySelector('img');
@@ -1297,7 +1559,7 @@ function base64ToFile(base64Data, filename) {
     setZoomLevel(1);
     setIsFrozen(false);
 
-  }, [clearWindowPosition, zoomLevel]);
+  }, [clearWindowPosition, zoomLevel, clearWindowSize]);
 
   // Show zoom hint when image is first loaded on mobile
   useEffect(() => {
@@ -1441,7 +1703,7 @@ function base64ToFile(base64Data, filename) {
             style={{
             position: "relative",
             width: boxWidth,
-            height: boxHeight,
+            height: (image === DEFAULT_IMAGE) ? DEFAULT_BOX_SIZE : boxHeight, // Square before image load, preserve ratio after
             top: isMobile ? "10px" : "-70px",
             borderRadius: "4px",
             border: `3px solid ${image === DEFAULT_IMAGE ? "#6EC2FF" : "#45FF02"}`,
@@ -1556,8 +1818,8 @@ function base64ToFile(base64Data, filename) {
                       position: "absolute",
                       left: `${clearWindowPosition.x}%`,
                       top: `${clearWindowPosition.y}%`,
-                      width: isMobile ? "150px" : "250px",
-                      height: isMobile ? "150px" : "250px",
+                      width: `${clearWindowSize.width}px`,
+                      height: `${clearWindowSize.height}px`,
                       cursor: isFrozen ? "default" : "move",
                       pointerEvents: "auto",
                       zIndex: 3,
@@ -1584,6 +1846,119 @@ function base64ToFile(base64Data, filename) {
                         transition: "all 0.3s ease"
                       }}
                     />
+                    
+                    {/* Resize Handles */}
+                    {!isFrozen && (
+                      <>
+                        {/* Corner handles */}
+                        <div
+                          className="resize-handle resize-handle-nw"
+                          data-direction="nw"
+                          style={{
+                            position: "absolute",
+                            width: "16px",
+                            height: "16px",
+                            top: "-5px",
+                            left: "-5px",
+                            cursor: "nwse-resize",
+                            zIndex: 4
+                          }}
+                        />
+                        <div
+                          className="resize-handle resize-handle-ne"
+                          data-direction="ne"
+                          style={{
+                            position: "absolute",
+                            width: "16px",
+                            height: "16px",
+                            top: "-5px",
+                            right: "-5px",
+                            cursor: "nesw-resize",
+                            zIndex: 4
+                          }}
+                        />
+                        <div
+                          className="resize-handle resize-handle-sw"
+                          data-direction="sw"
+                          style={{
+                            position: "absolute",
+                            width: "16px",
+                            height: "16px",
+                            bottom: "-5px",
+                            left: "-5px",
+                            cursor: "nesw-resize",
+                            zIndex: 4
+                          }}
+                        />
+                        <div
+                          className="resize-handle resize-handle-se"
+                          data-direction="se"
+                          style={{
+                            position: "absolute",
+                            width: "16px",
+                            height: "16px",
+                            bottom: "-5px",
+                            right: "-5px",
+                            cursor: "nwse-resize",
+                            zIndex: 4
+                          }}
+                        />
+                        
+                        {/* Edge handles */}
+                        <div
+                          className="resize-handle resize-handle-n"
+                          data-direction="n"
+                          style={{
+                            position: "absolute",
+                            width: "calc(100% - 20px)",
+                            height: "10px",
+                            top: "-5px",
+                            left: "10px",
+                            cursor: "ns-resize",
+                            zIndex: 4
+                          }}
+                        />
+                        <div
+                          className="resize-handle resize-handle-e"
+                          data-direction="e"
+                          style={{
+                            position: "absolute",
+                            width: "10px",
+                            height: "calc(100% - 20px)",
+                            top: "10px",
+                            right: "-5px",
+                            cursor: "ew-resize",
+                            zIndex: 4
+                          }}
+                        />
+                        <div
+                          className="resize-handle resize-handle-s"
+                          data-direction="s"
+                          style={{
+                            position: "absolute",
+                            width: "calc(100% - 20px)",
+                            height: "10px",
+                            bottom: "-5px",
+                            left: "10px",
+                            cursor: "ns-resize",
+                            zIndex: 4
+                          }}
+                        />
+                        <div
+                          className="resize-handle resize-handle-w"
+                          data-direction="w"
+                          style={{
+                            position: "absolute",
+                            width: "10px",
+                            height: "calc(100% - 20px)",
+                            top: "10px",
+                            left: "-5px",
+                            cursor: "ew-resize",
+                            zIndex: 4
+                          }}
+                        />
+                      </>
+                    )}
                     
                     {/* Zoom level indicator */}
                     {showZoomIndicator && (
