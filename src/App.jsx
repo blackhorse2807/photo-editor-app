@@ -257,126 +257,73 @@ function App() {
       // Handle different resize directions
       switch (resizeDirection) {
         case 'e': // East - right edge
-          newWidth = Math.max(50, startWidth + deltaX);
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth + deltaX));
           break;
         case 's': // South - bottom edge
-          newHeight = Math.max(50, startHeight + deltaY);
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight + deltaY));
           break;
         case 'w': // West - left edge
-          newWidth = Math.max(50, startWidth - deltaX);
-          newX = windowX + (deltaX * startWidth / containerWidth);
+          const westDelta = deltaX;
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth - westDelta));
+          newX = windowX + (westDelta * startWidth / containerWidth);
           break;
         case 'n': // North - top edge
-          newHeight = Math.max(50, startHeight - deltaY);
-          newY = windowY + (deltaY * startHeight / containerHeight);
+          const northDelta = deltaY;
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight - northDelta));
+          newY = windowY + (northDelta * startHeight / containerHeight);
           break;
         case 'se': // Southeast - bottom-right corner
-          newWidth = Math.max(50, startWidth + deltaX);
-          newHeight = Math.max(50, startHeight + deltaY);
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth + deltaX));
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight + deltaY));
           break;
         case 'sw': // Southwest - bottom-left corner
-          newWidth = Math.max(50, startWidth - deltaX);
-          newHeight = Math.max(50, startHeight + deltaY);
-          newX = windowX + (deltaX * startWidth / containerWidth);
+          const swDelta = deltaX;
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth - swDelta));
+          newX = windowX + (swDelta * startWidth / containerWidth);
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight + deltaY));
           break;
         case 'ne': // Northeast - top-right corner
-          newWidth = Math.max(50, startWidth + deltaX);
-          newHeight = Math.max(50, startHeight - deltaY);
-          newY = windowY + (deltaY * startHeight / containerHeight);
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth + deltaX));
+          const neDelta = deltaY;
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight - neDelta));
+          newY = windowY + (neDelta * startHeight / containerHeight);
           break;
         case 'nw': // Northwest - top-left corner
-          newWidth = Math.max(50, startWidth - deltaX);
-          newHeight = Math.max(50, startHeight - deltaY);
-          newX = windowX + (deltaX * startWidth / containerWidth);
-          newY = windowY + (deltaY * startHeight / containerHeight);
+          const nwDeltaX = deltaX;
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth - nwDeltaX));
+          newX = windowX + (nwDeltaX * startWidth / containerWidth);
+          const nwDeltaY = deltaY;
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight - nwDeltaY));
+          newY = windowY + (nwDeltaY * startHeight / containerHeight);
           break;
       }
       
-      // Ensure the window stays within container bounds
-      const widthPercent = (newWidth / containerWidth) * 100;
-      const heightPercent = (newHeight / containerHeight) * 100;
+      // Clamp position values to keep window within bounds
+      newX = Math.max(0, Math.min(100 - (newWidth / containerWidth) * 100, newX));
+      newY = Math.max(0, Math.min(100 - (newHeight / containerHeight) * 100, newY));
       
-      // Clamp position values
-      newX = Math.max(0, Math.min(66.67, newX)); // 100 - 33.33 = 66.67
-      newY = Math.max(0, Math.min(66.67, newY));
-      
-      // Enforce maximum size (80% of container)
-      const maxWidth = boxSize;
-      const maxHeight = boxSize;
-      newWidth = Math.min(newWidth, maxWidth);
-      newHeight = Math.min(newHeight, maxHeight);
-      
-      // Update states
-      setClearWindowSize({ 
-        width: container.width / 3,
-        height: container.height / 3
-      });
+      // Update states with new size and position
+      setClearWindowSize({ width: newWidth, height: newHeight });
       setClearWindowPosition({ x: newX, y: newY });
+      
     } else if (clearWindowTouchDragRef.current && e.touches.length === 1) {
-      // Handle dragging
+      // Handle dragging - existing code for dragging
       const touch = e.touches[0];
       const container = containerRef.current.getBoundingClientRect();
       const clearWindow = clearWindowRef.current.getBoundingClientRect();
     
-      // Calculate new position in percentages
       let newX = ((touch.clientX - container.left - clearWindow.width / 2) / container.width) * 100;
       let newY = ((touch.clientY - container.top - clearWindow.height / 2) / container.height) * 100;
     
-      // Clamp values to keep window within container
       newX = Math.max(0, Math.min(100 - (clearWindow.width / container.width) * 100, newX));
       newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
     
       setClearWindowPosition({ x: newX, y: newY });
-    } else if (clearWindowPinchRef.current && e.touches.length === 2) {
-      // Handle pinch-to-zoom
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      
-      // Calculate current distance
-      const currentDistance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-      
-      // Calculate zoom scale factor based on the change in distance
-      const scaleFactor = currentDistance / clearWindowInitialPinchDistanceRef.current;
-      
-      // Apply zoom with limits - make zooming smoother with a smaller increment
-      const newZoom = clearWindowInitialZoomRef.current * scaleFactor;
-      const clampedZoom = Math.min(Math.max(newZoom, minZoom), 3);
-      setZoomLevel(clampedZoom);
-      
-      // Show zoom indicator
-      setShowZoomIndicator(true);
-      
-      // Clear any existing timeout
-      if (zoomIndicatorTimeoutRef.current) {
-        clearTimeout(zoomIndicatorTimeoutRef.current);
-      }
-      
-      // Set new timeout to hide indicator
-      zoomIndicatorTimeoutRef.current = setTimeout(() => {
-        setShowZoomIndicator(false);
-      }, 1500);
     }
     
     e.preventDefault();
     e.stopPropagation();
-  }, [isFrozen, minZoom, zoomLevel, isResizing, resizeDirection]);
-
-  // Update touch event handling with passive: false
-  useEffect(() => {
-    const clearWindowElement = clearWindowRef.current;
-    
-    if (clearWindowElement && image !== DEFAULT_IMAGE) {
-      // Add touch event listeners with passive: false to allow preventDefault
-      clearWindowElement.addEventListener('touchmove', handleClearWindowTouchMove, { passive: false });
-      
-      return () => {
-        clearWindowElement.removeEventListener('touchmove', handleClearWindowTouchMove);
-      };
-    }
-  }, [image, handleClearWindowTouchMove]);
+  }, [isFrozen, isResizing, resizeDirection]);
 
   const handleClearWindowTouchEnd = (e) => {
     clearWindowTouchDragRef.current = false;
@@ -1342,7 +1289,6 @@ function base64ToFile(base64Data, filename) {
       setResizeDirection(e.target.dataset.direction);
       
       const container = containerRef.current.getBoundingClientRect();
-      const clearWindow = clearWindowRef.current.getBoundingClientRect();
       
       resizeStartRef.current = {
         x: e.clientX,
@@ -1356,7 +1302,7 @@ function base64ToFile(base64Data, filename) {
       };
     } else {
       // Otherwise, handle dragging
-    isDraggingWindowRef.current = true;
+      isDraggingWindowRef.current = true;
     }
     
     e.stopPropagation();
@@ -1370,7 +1316,6 @@ function base64ToFile(base64Data, filename) {
       const { x: startX, y: startY, width: startWidth, height: startHeight, 
               windowX, windowY, containerWidth, containerHeight } = resizeStartRef.current;
       
-      // Calculate delta movement
       const deltaX = e.clientX - startX;
       const deltaY = e.clientY - startY;
       
@@ -1382,84 +1327,67 @@ function base64ToFile(base64Data, filename) {
       // Handle different resize directions
       switch (resizeDirection) {
         case 'e': // East - right edge
-          newWidth = Math.max(50, startWidth + deltaX);
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth + deltaX));
           break;
         case 's': // South - bottom edge
-          newHeight = Math.max(50, startHeight + deltaY);
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight + deltaY));
           break;
         case 'w': // West - left edge
-          newWidth = Math.max(50, startWidth - deltaX);
-          newX = windowX + (deltaX * startWidth / containerWidth);
+          const westDelta = deltaX;
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth - westDelta));
+          newX = windowX + (westDelta * startWidth / containerWidth);
           break;
         case 'n': // North - top edge
-          newHeight = Math.max(50, startHeight - deltaY);
-          newY = windowY + (deltaY * startHeight / containerHeight);
+          const northDelta = deltaY;
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight - northDelta));
+          newY = windowY + (northDelta * startHeight / containerHeight);
           break;
         case 'se': // Southeast - bottom-right corner
-          newWidth = Math.max(50, startWidth + deltaX);
-          newHeight = Math.max(50, startHeight + deltaY);
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth + deltaX));
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight + deltaY));
           break;
         case 'sw': // Southwest - bottom-left corner
-          newWidth = Math.max(50, startWidth - deltaX);
-          newHeight = Math.max(50, startHeight + deltaY);
-          newX = windowX + (deltaX * startWidth / containerWidth);
+          const swDelta = deltaX;
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth - swDelta));
+          newX = windowX + (swDelta * startWidth / containerWidth);
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight + deltaY));
           break;
         case 'ne': // Northeast - top-right corner
-          newWidth = Math.max(50, startWidth + deltaX);
-          newHeight = Math.max(50, startHeight - deltaY);
-          newY = windowY + (deltaY * startHeight / containerHeight);
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth + deltaX));
+          const neDelta = deltaY;
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight - neDelta));
+          newY = windowY + (neDelta * startHeight / containerHeight);
           break;
         case 'nw': // Northwest - top-left corner
-          newWidth = Math.max(50, startWidth - deltaX);
-          newHeight = Math.max(50, startHeight - deltaY);
-          newX = windowX + (deltaX * startWidth / containerWidth);
-          newY = windowY + (deltaY * startHeight / containerHeight);
+          const nwDeltaX = deltaX;
+          newWidth = Math.max(containerWidth/6, Math.min(containerWidth, startWidth - nwDeltaX));
+          newX = windowX + (nwDeltaX * startWidth / containerWidth);
+          const nwDeltaY = deltaY;
+          newHeight = Math.max(containerHeight/6, Math.min(containerHeight, startHeight - nwDeltaY));
+          newY = windowY + (nwDeltaY * startHeight / containerHeight);
           break;
       }
       
-      // Ensure the window stays within container bounds
-      const widthPercent = (newWidth / containerWidth) * 100;
-      const heightPercent = (newHeight / containerHeight) * 100;
+      // Clamp position values to keep window within bounds
+      newX = Math.max(0, Math.min(100 - (newWidth / containerWidth) * 100, newX));
+      newY = Math.max(0, Math.min(100 - (newHeight / containerHeight) * 100, newY));
       
-      // Clamp position values
-      newX = Math.max(0, Math.min(100 - widthPercent, newX));
-      newY = Math.max(0, Math.min(100 - heightPercent, newY));
-      
-      // Set maximum size constraints
-      const maxWidth = containerWidth;
-      const maxHeight = Math.min(containerHeight, 400); // Cap height at 400px
-      
-      // If not actively resizing, maintain 1/3rd ratio
-      if (!isResizing && !isDraggingWindowRef.current) {
-        newWidth = containerWidth / 3;
-        newHeight = containerHeight / 3;
-      }
-      
-      // Enforce minimum size (1/6th) and maximum size
-      const minSize = Math.min(containerWidth, containerHeight) / 6;
-      newWidth = Math.min(Math.max(newWidth, minSize), maxWidth);
-      newHeight = Math.min(Math.max(newHeight, minSize), maxHeight);
-      
-      // Update states
-      setClearWindowSize({ 
-        width: container.width / 3,
-        height: container.height / 3
-      });
-      setClearWindowPosition({ x: 33.5, y: 33.5 });
+      // Update states with new size and position
+      setClearWindowSize({ width: newWidth, height: newHeight });
+      setClearWindowPosition({ x: newX, y: newY });
       
     } else if (isDraggingWindowRef.current) {
-    const container = containerRef.current.getBoundingClientRect();
-    const clearWindow = clearWindowRef.current.getBoundingClientRect();
-    
-    // Calculate new position in percentages
-    let newX = ((e.clientX - container.left - clearWindow.width / 2) / container.width) * 100;
-    let newY = ((e.clientY - container.top - clearWindow.height / 2) / container.height) * 100;
-    
-    // Clamp values to keep window within container
-    newX = Math.max(0, Math.min(100 - (clearWindow.width / container.width) * 100, newX));
-    newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
-    
-    setClearWindowPosition({ x: newX, y: newY });
+      // Handle dragging - existing code for dragging
+      const container = containerRef.current.getBoundingClientRect();
+      const clearWindow = clearWindowRef.current.getBoundingClientRect();
+      
+      let newX = ((e.clientX - container.left - clearWindow.width / 2) / container.width) * 100;
+      let newY = ((e.clientY - container.top - clearWindow.height / 2) / container.height) * 100;
+      
+      newX = Math.max(0, Math.min(100 - (clearWindow.width / container.width) * 100, newX));
+      newY = Math.max(0, Math.min(100 - (clearWindow.height / container.height) * 100, newY));
+      
+      setClearWindowPosition({ x: newX, y: newY });
     }
     
     e.preventDefault();
